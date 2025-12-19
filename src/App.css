@@ -1,0 +1,434 @@
+:root {
+  --marvel-red: #ff3333;
+  --marvel-blue: #33aaff;
+  --marvel-green: #33ff33;
+  --marvel-yellow: #ffee33;
+  --marvel-purple: #bb33ff;
+  --marvel-orange: #ffaa33;
+  --marvel-gray: #dddddd;
+
+  --bg-dark: #0a0b14;
+  --bg-panel: rgba(20, 24, 40, 0.85);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-dark);
+  background-image: url('./assets/background.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  color: white;
+  overflow: hidden;
+  /* App feel */
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.lobby-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  backdrop-filter: blur(5px);
+}
+
+.glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  border: var(--glass-border);
+  border-radius: 16px;
+  box-shadow: var(--glass-shadow);
+  padding: 2rem;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--marvel-blue), var(--marvel-purple));
+  border: none;
+  padding: 12px 24px;
+  color: white;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px rgba(51, 170, 255, 0.5);
+}
+
+.token {
+  width: 35px;
+  /* Slightly smaller tokens */
+  height: 35px;
+  border-radius: 50%;
+  box-shadow: inset 0 -3px 5px rgba(0, 0, 0, 0.5), 0 0 10px currentColor;
+  /* Outer glow provided by color */
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(0, 0, 0, 0) 50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  text-shadow: 0 2px 2px black;
+  cursor: pointer;
+  position: relative;
+}
+
+.token:active {
+  transform: scale(0.95);
+}
+
+.token.red {
+  background-color: var(--marvel-red);
+  color: var(--marvel-red);
+}
+
+.token.blue {
+  background-color: var(--marvel-blue);
+  color: var(--marvel-blue);
+}
+
+.token.green {
+  background-color: var(--marvel-green);
+  color: var(--marvel-green);
+}
+
+.token.yellow {
+  background-color: var(--marvel-yellow);
+  color: var(--marvel-yellow);
+}
+
+.token.purple {
+  background-color: var(--marvel-purple);
+  color: var(--marvel-purple);
+}
+
+.token.orange {
+  background-color: var(--marvel-orange);
+  color: var(--marvel-orange);
+}
+
+.token.gray {
+  background-color: var(--marvel-gray);
+  color: var(--marvel-gray);
+}
+
+.game-layout {
+  display: grid;
+  grid-template-columns: 250px 1fr 250px;
+  grid-template-rows: 1fr;
+  grid-template-areas:
+    "player-left board player-right";
+  height: 100%;
+  gap: 1rem;
+  padding: 5rem 1rem 1rem 1rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.player-panel.left {
+  grid-area: player-left;
+  overflow-y: auto;
+}
+
+.player-panel.right {
+  grid-area: player-right;
+  overflow-y: auto;
+}
+
+.board-center {
+  grid-area: board;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.game-log-container {
+  grid-area: log;
+  max-height: 150px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  border: 1px solid #444;
+  padding: 10px;
+}
+
+
+
+.turn-indicator-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  /* Click through */
+  z-index: 999;
+  /* On top of everything */
+  box-shadow: inset 0 0 0 4px var(--marvel-green), inset 0 0 50px var(--marvel-green);
+}
+
+.market-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+  /* Allow overflow to be visible so hover effects don't get clipped */
+  overflow: visible;
+  padding: 20px;
+  /* Add padding to prevent hover clipping at edges */
+}
+
+.board-center {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  /* Move scrolling to the container */
+  padding: 10px;
+}
+
+.card-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.card {
+  width: 120px;
+  height: 168px;
+  border-radius: 10px;
+  background: #222;
+  border: 1px solid #444;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: transform 0.2s;
+  background-size: 100%;
+  background-position: center;
+}
+
+.card:hover {
+  z-index: 10;
+  transform: scale(1.1);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.card-points {
+  font-size: 1.4rem;
+  font-weight: bold;
+  text-shadow: 0 1px 2px black;
+}
+
+.card.red {
+  border: 4px solid var(--marvel-red);
+  box-shadow: 0 0 5px var(--marvel-red);
+}
+
+.card.blue {
+  border: 4px solid var(--marvel-blue);
+  box-shadow: 0 0 5px var(--marvel-blue);
+}
+
+.card.green {
+  border: 4px solid var(--marvel-green);
+  box-shadow: 0 0 5px var(--marvel-green);
+}
+
+.card.orange {
+  border: 4px solid var(--marvel-orange);
+  box-shadow: 0 0 5px var(--marvel-orange);
+}
+
+.card.purple {
+  border: 4px solid var(--marvel-purple);
+  box-shadow: 0 0 5px var(--marvel-purple);
+}
+
+.card.yellow {
+  border: 4px solid var(--marvel-yellow);
+  box-shadow: 0 0 5px var(--marvel-yellow);
+}
+
+.card.white {
+  border: 4px solid white;
+  box-shadow: 0 0 5px white;
+}
+
+.card.black {
+  border: 4px solid #555;
+  box-shadow: 0 0 5px #555;
+}
+
+.card-cost {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  display: flex;
+  flex-direction: column-reverse;
+  /* Stack up */
+  gap: 2px;
+}
+
+.cost-bubble {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: white;
+  text-shadow: 0 1px 1px black;
+}
+
+.cost-bubble.red {
+  background: var(--marvel-red);
+}
+
+.cost-bubble.blue {
+  background: var(--marvel-blue);
+}
+
+.cost-bubble.green {
+  background: var(--marvel-green);
+}
+
+.cost-bubble.orange {
+  background: var(--marvel-orange);
+}
+
+.cost-bubble.purple {
+  background: var(--marvel-purple);
+}
+
+.cost-bubble.yellow {
+  background: var(--marvel-yellow);
+}
+
+.cost-bubble.white {
+  background: white;
+  color: black;
+}
+
+.cost-bubble.black {
+  background: #333;
+}
+
+.player-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+}
+
+.player-card {
+  background: var(--bg-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.active-turn {
+  border: 1px solid var(--marvel-yellow);
+  box-shadow: 0 0 10px var(--marvel-yellow);
+}
+
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 2px var(--glow-color, gold);
+    border-color: var(--glow-color, gold);
+  }
+
+  50% {
+    box-shadow: 0 0 10px var(--glow-color, gold);
+    border-color: var(--glow-color, gold);
+    filter: brightness(1.3);
+  }
+
+  100% {
+    box-shadow: 0 0 2px var(--glow-color, gold);
+    border-color: var(--glow-color, gold);
+  }
+}
+
+.card.affordable {
+  animation: glow 2s infinite;
+  border: 5px solid var(--glow-color, gold) !important;
+}
+
+/* Define glow colors based on card bonus */
+.card.affordable.red {
+  --glow-color: var(--marvel-red);
+}
+
+.card.affordable.blue {
+  --glow-color: var(--marvel-blue);
+}
+
+.card.affordable.green {
+  --glow-color: var(--marvel-green);
+}
+
+.card.affordable.yellow {
+  --glow-color: var(--marvel-yellow);
+}
+
+.card.affordable.purple {
+  --glow-color: var(--marvel-purple);
+}
+
+.card.affordable.orange {
+  --glow-color: var(--marvel-orange);
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.card-enter {
+  animation: card-enter 0.5s ease-out forwards;
+}

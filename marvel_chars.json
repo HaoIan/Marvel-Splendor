@@ -1,0 +1,362 @@
+[
+  {
+    "name": "A-Bomb",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/1-a-bomb.jpg"
+  },
+  {
+    "name": "Abomination",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/4-abomination.jpg"
+  },
+  {
+    "name": "Abraxas",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/5-abraxas.jpg"
+  },
+  {
+    "name": "Absorbing Man",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/6-absorbing-man.jpg"
+  },
+  {
+    "name": "Agent Bob",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/10-agent-bob.jpg"
+  },
+  {
+    "name": "Agent Zero",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/11-agent-zero.jpg"
+  },
+  {
+    "name": "Air-Walker",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/12-air-walker.jpg"
+  },
+  {
+    "name": "Ajax",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/13-ajax.jpg"
+  },
+  {
+    "name": "Angel Dust",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/25-angel-dust.jpg"
+  },
+  {
+    "name": "Annihilus",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/29-annihilus.jpg"
+  },
+  {
+    "name": "Ant-Man II",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/31-ant-man-ii.jpg"
+  },
+  {
+    "name": "Apocalypse",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/35-apocalypse.jpg"
+  },
+  {
+    "name": "Arachne",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/39-arachne.jpg"
+  },
+  {
+    "name": "Arclight",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/41-arclight.jpg"
+  },
+  {
+    "name": "Ardina",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/42-ardina.jpg"
+  },
+  {
+    "name": "Ares",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/43-ares.jpg"
+  },
+  {
+    "name": "Ariel",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/44-ariel.jpg"
+  },
+  {
+    "name": "Armor",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/45-armor.jpg"
+  },
+  {
+    "name": "Aurora",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/56-aurora.jpg"
+  },
+  {
+    "name": "Azazel",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/57-azazel.jpg"
+  },
+  {
+    "name": "Banshee",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/61-banshee.jpg"
+  },
+  {
+    "name": "Bantam",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/62-bantam.jpg"
+  },
+  {
+    "name": "Battlestar",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/72-battlestar.jpg"
+  },
+  {
+    "name": "Beast",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/75-beast.jpg"
+  },
+  {
+    "name": "Beta Ray Bill",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/79-beta-ray-bill.jpg"
+  },
+  {
+    "name": "Beyonder",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/80-beyonder.jpg"
+  },
+  {
+    "name": "Big Man",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/83-big-man.jpg"
+  },
+  {
+    "name": "Bird-Brain",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/88-bird-brain.jpg"
+  },
+  {
+    "name": "Bishop",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/92-bishop.jpg"
+  },
+  {
+    "name": "Black Bolt",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/96-black-bolt.jpg"
+  },
+  {
+    "name": "Black Cat",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/99-black-cat.jpg"
+  },
+  {
+    "name": "Black Knight III",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/102-black-knight-iii.jpg"
+  },
+  {
+    "name": "Black Mamba",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/104-black-mamba.jpg"
+  },
+  {
+    "name": "Black Panther",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/106-black-panther.jpg"
+  },
+  {
+    "name": "Black Widow",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/107-black-widow.jpg"
+  },
+  {
+    "name": "Blackout",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/109-blackout.jpg"
+  },
+  {
+    "name": "Blackwing",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/110-blackwing.jpg"
+  },
+  {
+    "name": "Blackwulf",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/111-blackwulf.jpg"
+  },
+  {
+    "name": "Blade",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/112-blade.jpg"
+  },
+  {
+    "name": "Bling!",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/114-bling!.jpg"
+  },
+  {
+    "name": "Blink",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/115-blink.jpg"
+  },
+  {
+    "name": "Blizzard II",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/118-blizzard-ii.jpg"
+  },
+  {
+    "name": "Blob",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/119-blob.jpg"
+  },
+  {
+    "name": "Bloodaxe",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/120-bloodaxe.jpg"
+  },
+  {
+    "name": "Bloodhawk",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/121-bloodhawk.jpg"
+  },
+  {
+    "name": "Bullseye",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/141-bullseye.jpg"
+  },
+  {
+    "name": "Cable",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/145-cable.jpg"
+  },
+  {
+    "name": "Callisto",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/146-callisto.jpg"
+  },
+  {
+    "name": "Cannonball",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/148-cannonball.jpg"
+  },
+  {
+    "name": "Captain America",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/149-captain-america.jpg"
+  },
+  {
+    "name": "Captain Britain",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/151-captain-britain.jpg"
+  },
+  {
+    "name": "Captain Planet",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/160-captain-planet.jpg"
+  },
+  {
+    "name": "Carnage",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/162-carnage.jpg"
+  },
+  {
+    "name": "Century",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/167-century.jpg"
+  },
+  {
+    "name": "Chamber",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/169-chamber.jpg"
+  },
+  {
+    "name": "Changeling",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/171-changeling.jpg"
+  },
+  {
+    "name": "Cloak",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/180-cloak.jpg"
+  },
+  {
+    "name": "Colossus",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/185-colossus.jpg"
+  },
+  {
+    "name": "Copycat",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/186-copycat.jpg"
+  },
+  {
+    "name": "Cottonmouth",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/188-cottonmouth.jpg"
+  },
+  {
+    "name": "Crystal",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/191-crystal.jpg"
+  },
+  {
+    "name": "Cyclops",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/196-cyclops.jpg"
+  },
+  {
+    "name": "Dagger",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/198-dagger.jpg"
+  },
+  {
+    "name": "Daredevil",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/201-daredevil.jpg"
+  },
+  {
+    "name": "Darkhawk",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/202-darkhawk.jpg"
+  },
+  {
+    "name": "Darkstar",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/206-darkstar.jpg"
+  },
+  {
+    "name": "Dazzler",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/211-dazzler.jpg"
+  },
+  {
+    "name": "Deathlok",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/215-deathlok.jpg"
+  },
+  {
+    "name": "Demogoblin",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/217-demogoblin.jpg"
+  },
+  {
+    "name": "Destroyer",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/218-destroyer.jpg"
+  },
+  {
+    "name": "Diamondback",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/219-diamondback.jpg"
+  },
+  {
+    "name": "Doc Samson",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/221-doc-samson.jpg"
+  },
+  {
+    "name": "Doctor Doom",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/222-doctor-doom.jpg"
+  },
+  {
+    "name": "Doctor Octopus",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/225-doctor-octopus.jpg"
+  },
+  {
+    "name": "Doctor Strange",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/226-doctor-strange.jpg"
+  },
+  {
+    "name": "Domino",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/227-domino.jpg"
+  },
+  {
+    "name": "Doppelganger",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/231-doppelganger.jpg"
+  },
+  {
+    "name": "Dormammu",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/232-dormammu.jpg"
+  },
+  {
+    "name": "Drax the Destroyer",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/234-drax-the-destroyer.jpg"
+  },
+  {
+    "name": "Ego",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/235-ego.jpg"
+  },
+  {
+    "name": "Electro",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/237-electro.jpg"
+  },
+  {
+    "name": "Elektra",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/238-elektra.jpg"
+  },
+  {
+    "name": "Emma Frost",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/241-emma-frost.jpg"
+  },
+  {
+    "name": "Evilhawk",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/248-evilhawk.jpg"
+  },
+  {
+    "name": "Exodus",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/249-exodus.jpg"
+  },
+  {
+    "name": "Falcon",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/251-falcon.jpg"
+  },
+  {
+    "name": "Fallen One II",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/252-fallen-one-ii.jpg"
+  },
+  {
+    "name": "Feral",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/254-feral.jpg"
+  },
+  {
+    "name": "Fin Fang Foom",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/256-fin-fang-foom.jpg"
+  },
+  {
+    "name": "Firebird",
+    "image": "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/257-firebird.jpg"
+  }
+]
