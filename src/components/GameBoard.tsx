@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import type { GameState, Card as CardType, TokenBank, Player, Cost } from '../types';
 import type { GameAction } from '../hooks/gameReducer';
+import cardBack1 from '../assets/card-back-1.png';
+import cardBack2 from '../assets/card-back-2.png';
+import cardBack3 from '../assets/card-back-3.png';
+
+const CARD_BACKS: Record<number, string> = {
+    1: cardBack1,
+    2: cardBack2,
+    3: cardBack3
+};
 
 // Sub-components
 const Token = ({ color, count, onClick }: { color: keyof TokenBank, count: number, onClick?: () => void }) => (
@@ -316,7 +325,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         <div key={tier} className="card-row">
                             {/* Deck Back */}
                             <div className="card" style={{
-                                backgroundImage: `url(/assets/card-back-${tier}.png)`,
+                                backgroundImage: `url(${CARD_BACKS[tier]})`,
+                                backgroundSize: '200%', // Zoom in to remove transparent padding
                                 display: 'flex', alignItems: 'center', justifyContent: 'center'
                             }}>
                                 <div style={{
