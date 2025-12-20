@@ -65,7 +65,14 @@ const FlyingItem: React.FC<{ item: AnimationItem, onComplete: (id: string) => vo
 
     if (item.type === 'token') {
         return (
-            <div style={style} className={`token ${item.content} flying-token`}>
+            <div style={{
+                ...style,
+                backgroundImage: `url(${item.content})`,
+                backgroundSize: 'contain',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                borderRadius: '50%',
+            }} className="flying-token">
                 {/* No count needed for flying token usually, just the visual */}
             </div>
         );

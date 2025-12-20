@@ -33,6 +33,11 @@ body {
   flex-direction: column;
 }
 
+.App {
+  width: 100%;
+  height: 100%;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -74,8 +79,6 @@ body {
   border-radius: 8px;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
-  text-transform: uppercase;
-  letter-spacing: 1px;
 }
 
 .btn-primary:hover {
@@ -142,12 +145,12 @@ body {
 
 .game-layout {
   display: grid;
-  grid-template-columns: 250px 1fr 250px;
+  grid-template-columns: max-content 1fr;
   grid-template-rows: 1fr;
   grid-template-areas:
-    "player-left board player-right";
+    "board player-right";
   height: 100%;
-  gap: 1rem;
+  gap: 0;
   padding: 5rem 1rem 1rem 1rem;
   box-sizing: border-box;
   overflow: hidden;
@@ -161,6 +164,13 @@ body {
 .player-panel.right {
   grid-area: player-right;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  /* Critical for grid scrolling */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Don't stretch vertically if few players */
 }
 
 .board-center {
@@ -168,6 +178,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .game-log-container {
@@ -202,7 +213,8 @@ body {
   align-items: center;
   /* Allow overflow to be visible so hover effects don't get clipped */
   overflow: visible;
-  padding: 20px;
+  padding: 20px 20px 20px 50px;
+  /* Left padding for Deck Count */
   /* Add padding to prevent hover clipping at edges */
 }
 
@@ -212,7 +224,7 @@ body {
   height: 100%;
   overflow-y: auto;
   /* Move scrolling to the container */
-  padding: 10px;
+  padding: 10px 0 10px 10px;
 }
 
 .card-row {
@@ -241,6 +253,10 @@ body {
   z-index: 10;
   transform: scale(1.1);
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+}
+
+.card.disabled {
+  cursor: default;
 }
 
 .card-header {
@@ -453,4 +469,38 @@ body {
   animation: card-enter 1s ease-out forwards;
   animation-delay: 0.8s;
   /* Time for the flying token to get there and flip */
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.toast-notification {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  animation: toast-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.toast-notification.error {
+  background: rgba(255, 50, 50, 0.95);
+}
+
+.toast-notification.info {
+  background: rgba(50, 50, 50, 0.95);
 }

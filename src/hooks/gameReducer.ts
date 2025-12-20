@@ -52,7 +52,7 @@ export const createInitialState = (playerConfig: { id: string; name: string; uui
     return {
         players,
         currentPlayerIndex: 0,
-        tokens: { red: bankSize, blue: bankSize, yellow: bankSize, purple: bankSize, orange: bankSize, green: 0, gray: 5 },
+        tokens: { red: bankSize, blue: bankSize, yellow: bankSize, purple: bankSize, orange: bankSize, green: bankSize, gray: 5 },
         decks: { 1: deck1, 2: deck2, 3: deck3 },
         market,
         nobles: [],
@@ -187,6 +187,11 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             player.points += card.points;
 
             if (card.tier === 3 && player.tokens.green === 0) {
+                // If bank has the green token (it should), take it.
+                // Even if bank logic was off, rule is you get it. But we want to track bank state.
+                if (newBank.green > 0) {
+                    newBank.green -= 1;
+                }
                 player.tokens.green = 1;
             }
 

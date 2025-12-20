@@ -7,6 +7,25 @@ import cardBack1 from '../assets/card-back-1.png';
 import cardBack2 from '../assets/card-back-2.png';
 import cardBack3 from '../assets/card-back-3.png';
 
+// Token Assets
+import mindToken from '../assets/mind-token.png';
+import powerToken from '../assets/power-token.png';
+import realityToken from '../assets/reality-token.png';
+import shieldToken from '../assets/shield-token.png';
+import soulToken from '../assets/soul-token.png';
+import spaceToken from '../assets/space-token.png';
+import timeToken from '../assets/time-token.png';
+
+const TOKEN_IMAGES: Record<string, string> = {
+    yellow: mindToken,
+    purple: powerToken,
+    red: realityToken,
+    gray: shieldToken,
+    orange: soulToken,
+    blue: spaceToken,
+    green: timeToken
+};
+
 const CARD_BACKS: Record<number, string> = {
     1: cardBack1,
     2: cardBack2,
@@ -14,20 +33,42 @@ const CARD_BACKS: Record<number, string> = {
 };
 
 // Sub-components
-const Token = ({ color, count, onClick }: { color: keyof TokenBank, count: number, onClick?: () => void }) => (
+const Token = ({ color, count, onClick, size = 100, style }: { color: keyof TokenBank, count: number, onClick?: () => void, size?: number, style?: React.CSSProperties }) => (
     <div
         id={onClick ? `token-bank-${color}` : undefined} // ID for animation source
         className={`token ${color}`}
         onClick={onClick}
-        style={{ opacity: count > 0 ? 1 : 0.5, pointerEvents: count > 0 ? 'auto' : 'none' }}
+        style={{
+            opacity: count > 0 ? 1 : 0.5,
+            pointerEvents: count > 0 ? 'auto' : 'none',
+            backgroundImage: `url(${TOKEN_IMAGES[color]})`,
+            backgroundSize: 'contain',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            backgroundColor: 'transparent',
+            boxShadow: 'none',
+            border: 'none',
+            width: size,
+            height: size,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            ...style
+        }}
     >
-        {count}
+        <span style={{
+            textShadow: '0 0 4px #000, 0 0 2px #000',
+            color: 'white',
+            fontSize: `${size * 0.25}px`
+        }}>
+            {count}
+        </span>
     </div>
 );
 
-const CardView = ({ card, onClick, disabled, canAfford }: { card: CardType, onClick: () => void, disabled?: boolean, canAfford?: boolean }) => {
+const CardView = ({ card, onClick, disabled, canAfford, noAnimate }: { card: CardType, onClick: () => void, disabled?: boolean, canAfford?: boolean, noAnimate?: boolean }) => {
     const bgImage = card.imageUrl || `/assets/hero-tier-${card.tier}.png`;
-    const [animate, setAnimate] = useState(true);
+    const [animate, setAnimate] = useState(!noAnimate);
     const [animDelay, setAnimDelay] = useState('0s');
 
     useEffect(() => {
@@ -96,9 +137,10 @@ const PlayerArea = ({ player, isActive, onCardClick, isMe }: { player: Player, i
         </div>
 
         {/* Tokens */}
-        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', margin: '5px 0' }}>
+        {/* Tokens */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', margin: '5px 0' }}>
             {Object.entries(player.tokens).map(([color, count]) => (
-                count > 0 ? <div key={color} className={`cost-bubble ${color}`}>{count}</div> : null
+                count > 0 ? <Token key={color} color={color as keyof TokenBank} count={count} size={50} style={{ margin: '0 -5px' }} /> : null
             ))}
         </div>
 
@@ -158,6 +200,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
     // Track previous market state to detect new cards
     const prevMarketRef = React.useRef(state.market);
+
+    // Custom UI State
+    const [toast, setToast] = useState<{ message: string, type: 'error' | 'info' } | null>(null);
+    const [confirmModal, setConfirmModal] = useState<{ message: string, onConfirm: () => void } | null>(null);
+
+    // Auto-clear toast
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
+
     // Use useLayoutEffect to hide cards BEFORE paint to prevent flash
     React.useLayoutEffect(() => {
         const prevMarket = prevMarketRef.current;
@@ -256,10 +311,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         setSelectedTokens({});
     }, [state.currentPlayerIndex]);
 
-    // Split players for left/right panels
-    const midPoint = Math.ceil(state.players.length / 2);
-    const leftPlayers = state.players.slice(0, midPoint);
-    const rightPlayers = state.players.slice(midPoint);
+    // Split players for left/right panels - DEPRECATED
+    // const midPoint = Math.ceil(state.players.length / 2);
+    // const leftPlayers = state.players.slice(0, midPoint);
+    // const rightPlayers = state.players.slice(midPoint);
 
     const handleTakeToken = (color: keyof TokenBank) => {
         if (!isMyTurn) return;
@@ -274,11 +329,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
         if (newCount === 2) {
             if (state.tokens[color] < 4) {
-                alert("Cannot take 2 of this color (less than 4 in bank).");
+                setToast({ message: "Cannot take 2 of this color (less than 4 in bank).", type: 'error' });
                 return;
             }
             if (totalSelected > 1) {
-                alert("Cannot take 2 of same color if you have other colors selected.");
+                setToast({ message: "Cannot take 2 of same color if you have other colors selected.", type: 'error' });
                 return;
             }
             currentSelection[color] = 2;
@@ -286,11 +341,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         } else if (newCount === 1) {
             const hasDouble = Object.values(currentSelection).some(v => v === 2);
             if (hasDouble) {
-                alert("Cannot take different colors if you selected 2 of the same.");
+                setToast({ message: "Cannot take different colors if you selected 2 of the same.", type: 'error' });
                 return;
             }
             if (distinctColors >= 3) {
-                alert("Max 3 distinct tokens.");
+                setToast({ message: "Max 3 distinct tokens.", type: 'error' });
                 return;
             }
             currentSelection[color] = 1;
@@ -303,8 +358,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         const currentTotal = Object.values(player.tokens).reduce((a, b) => a + b, 0);
         const selectedCount = Object.values(selectedTokens).reduce((a, b) => a + b, 0);
 
+
         if (currentTotal + selectedCount > 10) {
-            alert(`Cannot take tokens: You have ${currentTotal} and selected ${selectedCount}. Limit is 10.`);
+            setToast({ message: `Cannot take tokens: You have ${currentTotal} and selected ${selectedCount}. Limit is 10.`, type: 'error' });
             return;
         }
 
@@ -320,7 +376,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 for (let i = 0; i < count; i++) {
                     // Stagger slightly?
                     setTimeout(() => {
-                        triggerAnimation('token', color, `token-bank-${color}`, `player-area-${playerId}`);
+                        triggerAnimation('token', TOKEN_IMAGES[color], `token-bank-${color}`, `player-area-${playerId}`);
                     }, i * 100);
                 }
             }
@@ -387,6 +443,36 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             {/* Turn Indicator Overlay */}
             {isMyTurn && <div className="turn-indicator-overlay"></div>}
 
+            {/* Custom Toast */}
+            {toast && (
+                <div className={`toast-notification ${toast.type}`}>
+                    {toast.message}
+                </div>
+            )}
+
+            {/* Custom Confirm Modal */}
+            {confirmModal && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                    background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001
+                }} onClick={() => setConfirmModal(null)}>
+                    <div style={{
+                        background: '#1a1d2e', padding: '24px', borderRadius: '12px', border: '1px solid #444',
+                        maxWidth: '400px', width: '90%', textAlign: 'center', boxShadow: '0 0 40px rgba(0,0,0,0.5)'
+                    }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ margin: '0 0 16px 0', color: 'white' }}>Confirm Action</h3>
+                        <p style={{ color: '#ccc', marginBottom: '24px' }}>{confirmModal.message}</p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                            <button className="btn-primary" style={{ background: '#555' }} onClick={() => setConfirmModal(null)}>Cancel</button>
+                            <button className="btn-primary" style={{ background: 'var(--marvel-red)' }} onClick={() => {
+                                confirmModal.onConfirm();
+                                setConfirmModal(null);
+                            }}>Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Status Text */}
             <div style={{
                 position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)',
@@ -408,9 +494,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                     onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (confirm("Are you sure you want to close the lobby? This will disconnect all players.")) {
-                            closeLobby();
-                        }
+                        setConfirmModal({
+                            message: "Are you sure you want to close the lobby? This will disconnect all players.",
+                            onConfirm: () => closeLobby()
+                        });
                     }}
                     style={{
                         position: 'absolute', top: '10px', right: '10px',
@@ -423,51 +510,71 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 </button>
             )}
 
-            <div className="player-panel left">
-                {leftPlayers.map((p) => (
-                    <PlayerArea key={p.id} player={p} isActive={state.players.indexOf(p) === state.currentPlayerIndex} onCardClick={handleCardClick} isMe={p.id === myPeerId} />
-                ))}
-            </div>
+
 
             <div className="board-center">
                 {/* Bank */}
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', paddingTop: '10px' }}>
-                    <div style={{ position: 'relative', display: 'flex', gap: '10px' }}>
+                {/* Bank */}
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', marginBottom: '15px', marginTop: '-10px', paddingLeft: '50px', boxSizing: 'border-box' }}>
+
+                    {/* Buttons - Static Positioned Left */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginRight: '20px' }}>
+                        <button
+                            onClick={confirmTakeTokens}
+                            className="btn-primary"
+                            disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
+                            style={{
+                                padding: '6px 12px',
+                                fontSize: '0.8rem',
+                                opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
+                                cursor: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 'not-allowed' : 'pointer',
+                                transition: 'opacity 0.2s'
+                            }}
+                        >
+                            Confirm
+                        </button>
+                        <button
+                            onClick={() => setSelectedTokens({})}
+                            disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
+                            style={{
+                                background: '#444', border: 'none', color: 'white', padding: '4px', borderRadius: '4px', fontSize: '0.8rem',
+                                opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
+                                cursor: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 'not-allowed' : 'pointer',
+                                transition: 'opacity 0.2s'
+                            }}
+                        >
+                            Reset
+                        </button>
+                    </div>
+
+                    <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
                         {(['red', 'blue', 'yellow', 'purple', 'orange', 'gray', 'green'] as const).map(c => (
-                            <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                            <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', margin: '-15px -10px' }}>
                                 <Token color={c} count={state.tokens[c]} onClick={() => handleTakeToken(c)} />
                                 {selectedTokens[c as keyof TokenBank] ? (
                                     <span style={{
-                                        position: 'absolute', bottom: '-20px', left: '50%', transform: 'translateX(-50%)',
-                                        color: 'lime', fontWeight: 'bold', textShadow: '0 1px 2px black'
+                                        position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%)',
+                                        color: 'lime', fontWeight: 'bold', textShadow: '0 0 4px black, 0 0 2px black',
+                                        fontSize: '1.2rem', zIndex: 10, pointerEvents: 'none'
                                     }}>
                                         +{selectedTokens[c as keyof TokenBank]}
                                     </span>
                                 ) : null}
                             </div>
                         ))}
-                        {/* Buttons - Absolute positioned relative to the token cluster */}
-                        {isMyTurn && Object.keys(selectedTokens).length > 0 &&
-                            <div style={{
-                                position: 'absolute', top: '50%', left: '100%', transform: 'translate(15px, -50%)',
-                                display: 'flex', flexDirection: 'column', gap: '5px', width: 'max-content'
-                            }}>
-                                <button onClick={confirmTakeTokens} className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>Confirm</button>
-                                <button onClick={() => setSelectedTokens({})} style={{ background: '#444', border: 'none', color: 'white', padding: '4px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Reset</button>
-                            </div>
-                        }
                     </div>
                 </div>
 
                 {/* Market */}
                 <div className="market-grid">
                     {[3, 2, 1].map(tier => (
-                        <div key={tier} className="card-row">
+                        <div key={tier} className="card-row" style={{ justifyContent: 'flex-start' }}>
                             {/* Deck Count & Back */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
                                 <div style={{
                                     display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                    color: '#aaa', fontSize: '0.8rem', width: '40px'
+                                    color: '#aaa', fontSize: '0.8rem', width: '40px',
+                                    position: 'absolute', right: '100%', marginRight: '10px'
                                 }}>
                                     <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'white' }}>
                                         {state.decks[tier as 1 | 2 | 3].length}
@@ -475,12 +582,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                     <span>left</span>
                                 </div>
                                 {state.decks[tier as 1 | 2 | 3].length > 0 ? (
-                                    <div id={`deck-tier-${tier}`} className="card" style={{
+                                    <div id={`deck-tier-${tier}`} className="card disabled" style={{
                                         backgroundImage: `url(${CARD_BACKS[tier]})`,
                                         backgroundSize: '200%', // Zoom in to remove transparent padding
                                         display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}>
-                                        {/* Content removed, now just the back image */}
                                     </div>
                                 ) : (
                                     <div style={{ width: '120px', height: '168px', border: '1px dashed #333', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444' }}>
@@ -505,7 +611,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             </div>
 
             <div className="player-panel right">
-                {rightPlayers.map((p) => (
+                {state.players.map((p) => (
                     <PlayerArea key={p.id} player={p} isActive={state.players.indexOf(p) === state.currentPlayerIndex} onCardClick={handleCardClick} isMe={p.id === myPeerId} />
                 ))}
             </div>
@@ -522,7 +628,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         <h3>Selected Card</h3>
                         <div style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
                             <div id="modal-card-view" style={{ transform: 'scale(1.5)', margin: '30px' }}>
-                                <CardView card={selectedCard} onClick={() => { }} disabled />
+                                <CardView card={selectedCard} onClick={() => { }} disabled noAnimate />
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
