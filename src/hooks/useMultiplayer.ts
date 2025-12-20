@@ -33,6 +33,12 @@ export const useMultiplayer = (
     const connectionsRef = useRef<DataConnection[]>([]); // Host: list of clients
     const clientConnRef = useRef<DataConnection | null>(null); // Client: connection to host
 
+    // IMPORTANT: Track latest gameState in ref so event listeners (which are closures) can access it
+    const gameStateRef = useRef(gameState);
+    useEffect(() => {
+        gameStateRef.current = gameState;
+    }, [gameState]);
+
     // Initialize Peer
     useEffect(() => {
         const savedPeerId = sessionStorage.getItem('splendor_peerId');
@@ -82,16 +88,18 @@ export const useMultiplayer = (
                     connectedPeers: [...prev.connectedPeers, conn.peer],
                     connectionStatus: 'connected'
                 }));
-                // Send current state to new player
-                conn.send({ type: 'SYNC_STATE', state: gameState });
+                // Send current state to new player - USE REF to get latest state!
+                conn.send({ type: 'SYNC_STATE', state: gameStateRef.current });
             });
 
             conn.on('data', (data: any) => {
                 if (data.type === 'PLAYER_HELLO') {
                     const { name, id, uuid } = data;
 
-                    // Check for reconnection
-                    const existingPlayer = gameState.players.find(p => p.uuid === uuid);
+                    // Check for reconnection - USE REF
+                    const currentGameState = gameStateRef.current;
+                    const existingPlayer = currentGameState.players.find(p => p.uuid === uuid);
+
                     if (existingPlayer && existingPlayer.id !== id) {
                         console.log(`Player ${name} reconnected with new ID ${id} (old: ${existingPlayer.id})`);
                         // Dispatch action to update player ID in game state

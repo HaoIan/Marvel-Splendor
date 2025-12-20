@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { GameState, Card as CardType, TokenBank, Player, Cost } from '../types';
 import type { GameAction } from '../hooks/gameReducer';
 import { AnimationOverlay, type AnimationItem } from './AnimationOverlay';
@@ -138,6 +138,9 @@ const PlayerArea = ({ player, isActive, onCardClick, isMe }: { player: Player, i
 
         {/* Tokens */}
         {/* Tokens */}
+        <div style={{ fontSize: '0.7rem', color: '#aaa', marginBottom: '2px' }}>
+            Tokens ({Object.values(player.tokens).reduce((a, b) => a + b, 0)}/10)
+        </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', margin: '5px 0' }}>
             {Object.entries(player.tokens).map(([color, count]) => (
                 count > 0 ? <Token key={color} color={color as keyof TokenBank} count={count} size={50} style={{ margin: '0 -5px' }} /> : null
@@ -202,6 +205,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const prevMarketRef = React.useRef(state.market);
 
     // Custom UI State
+    const [showResults, setShowResults] = useState(true);
     const [toast, setToast] = useState<{ message: string, type: 'error' | 'info' } | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string, onConfirm: () => void } | null>(null);
 
@@ -212,6 +216,40 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             return () => clearTimeout(timer);
         }
     }, [toast]);
+
+    // Handle ESC key to close modals
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (confirmModal) {
+                    setConfirmModal(null);
+                } else if (selectedCard) {
+                    setSelectedCard(null);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [confirmModal, selectedCard]);
+
+    // Track notified players for win condition to prevent spam
+    const notifiedWinnersRef = useRef<Set<string>>(new Set());
+
+    // Check for winning condition (>= 16 points AND has Time Stone)
+    useEffect(() => {
+        state.players.forEach(p => {
+            const hasGreenToken = p.tokens.green > 0;
+            // Marvel Splendor Win Condition: 16 Points + Time Stone (Green Token)
+            if (p.points >= 16 && hasGreenToken && !notifiedWinnersRef.current.has(p.id) && state.status !== 'GAME_OVER') {
+                notifiedWinnersRef.current.add(p.id);
+                setToast({
+                    message: `${p.name} has met the winning criteria! Score higher to overtake!`,
+                    type: 'info'
+                });
+            }
+        });
+    }, [state.players, state.status]);
 
     // Use useLayoutEffect to hide cards BEFORE paint to prevent flash
     React.useLayoutEffect(() => {
@@ -317,10 +355,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     // const rightPlayers = state.players.slice(midPoint);
 
     const handleTakeToken = (color: keyof TokenBank) => {
-        if (!isMyTurn) return;
+        if (state.status === 'GAME_OVER') {
+            setToast({ message: "Game is over!", type: 'info' });
+            return;
+        }
+        if (!isMyTurn) return; // Silent return for tokens selection out of turn to rely on confirm button disabled state? 
+        // Actually, previous logic just returned silently. Let's keep it consistent or verify if we want feedback.
+        // User asked "disallow changes... with corresponding feedback" generally. 
+        // For tokens, selection is local state until confirmed. 
+        // But if game is over, we shouldn't even select.
+
+        // Let's rely on isMyTurn check, BUT if game is over, isMyTurn might be false anyway. 
+        // However, we want to be explicit.
         if (color === 'gray' || color === 'green') return;
 
         const currentSelection = { ...selectedTokens };
+        // ... rest of logic
         const currentCount = currentSelection[color] || 0;
         const newCount = currentCount + 1;
 
@@ -354,6 +404,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     };
 
     const confirmTakeTokens = () => {
+        if (state.status === 'GAME_OVER') {
+            setToast({ message: "Game is over!", type: 'info' });
+            return;
+        }
         const player = state.players[state.currentPlayerIndex];
         const currentTotal = Object.values(player.tokens).reduce((a, b) => a + b, 0);
         const selectedCount = Object.values(selectedTokens).reduce((a, b) => a + b, 0);
@@ -387,13 +441,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     };
 
     const handleCardClick = (card: CardType) => {
-        if (!isMyTurn) return;
+        // Allow inspection anytime
         setSelectedCard(card);
     };
 
     // Validation for Recruitment
     const canAfford = (card: CardType) => {
-        if (!isMyTurn) return false;
+        // Allow check anytime so we can see costs
         const player = state.players[state.currentPlayerIndex];
 
         // Calculate Cost
@@ -418,6 +472,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     };
 
     const handleAction = (type: 'RECRUIT' | 'RESERVE') => {
+        if (state.status === 'GAME_OVER') {
+            setToast({ message: "The game has ended. You cannot make moves.", type: 'info' });
+            return;
+        }
+        if (!isMyTurn) {
+            setToast({ message: "It is not your turn!", type: 'error' });
+            return;
+        }
         if (!selectedCard) return;
 
         const playerId = state.players[state.currentPlayerIndex].id;
@@ -697,7 +759,47 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                 return (
                                     <>
                                         {canAfford(selectedCard) ? (
-                                            <button className="btn-primary" onClick={() => handleAction('RECRUIT')}>Recruit</button>
+                                            <button className="btn-primary" onClick={() => handleAction('RECRUIT')}>
+                                                {(() => {
+                                                    // Calculate what actually needs to be paid
+                                                    const discount: Record<string, number> = { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0 };
+                                                    player.tableau.forEach(c => {
+                                                        if (c.bonus && discount[c.bonus] !== undefined) discount[c.bonus]++;
+                                                    });
+
+                                                    const cost = selectedCard.cost;
+                                                    const pay: string[] = [];
+                                                    let goldToPay = 0;
+
+                                                    // First pass: what can we pay with regular tokens?
+                                                    for (const c of ['red', 'blue', 'yellow', 'purple', 'orange'] as const) {
+                                                        const val = cost[c as keyof Cost] || 0;
+                                                        const effectiveCost = Math.max(0, val - (discount[c] || 0));
+
+                                                        if (effectiveCost > 0) {
+                                                            // We need to pay 'effectiveCost'.
+                                                            // We use tokens first, then gold.
+                                                            const tokenAvailable = player.tokens[c];
+                                                            if (tokenAvailable >= effectiveCost) {
+                                                                pay.push(`${effectiveCost} ${c.charAt(0).toUpperCase() + c.slice(1)}`);
+                                                            } else {
+                                                                // Pay all tokens, rest gold
+                                                                if (tokenAvailable > 0) {
+                                                                    pay.push(`${tokenAvailable} ${c.charAt(0).toUpperCase() + c.slice(1)}`);
+                                                                }
+                                                                goldToPay += (effectiveCost - tokenAvailable);
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if (goldToPay > 0) {
+                                                        pay.push(`${goldToPay} Shield`);
+                                                    }
+
+                                                    if (pay.length === 0) return "Recruit (Free)";
+                                                    return `Recruit (${pay.join(', ')})`;
+                                                })()}
+                                            </button>
                                         ) : (
                                             <button disabled style={{ padding: '12px 24px', background: '#555', color: '#aaa', border: 'none', borderRadius: '8px', cursor: 'not-allowed' }}>
                                                 {missing ? missing : "Cannot Afford"}
@@ -717,40 +819,65 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                             })()}
                             <button style={{ padding: '10px', background: 'transparent', border: '1px solid #666', color: 'white', borderRadius: '4px', cursor: 'pointer' }} onClick={() => setSelectedCard(null)}>Cancel</button>
                         </div>
-                        <p style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '10px' }}>Recruit adds to Tableau. Reserve adds to Hand + 1 Gold.</p>
+                        <p style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '10px' }}>Recruit adds to Tableau. Reserve adds to Hand + 1 Shield.</p>
                     </div>
                 </div>
             )}
             {/* Victory Screen */}
             {state.status === 'GAME_OVER' && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                    background: 'rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 2000
-                }}>
-                    <h1 style={{ fontSize: '4rem', color: 'gold', textShadow: '0 0 20px orange', marginBottom: '20px' }}>Game Over!</h1>
-                    <h2 style={{ fontSize: '2rem', color: 'white', marginBottom: '40px' }}>{state.winner} Wins!</h2>
-                    <div style={{ display: 'flex', gap: '20px' }}>
-                        {state.players.map(p => (
-                            <div key={p.id} style={{
-                                background: p.name === state.winner ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.1)',
-                                padding: '20px', borderRadius: '10px', border: p.name === state.winner ? '2px solid gold' : '1px solid #444',
-                                textAlign: 'center'
-                            }}>
-                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '10px' }}>{p.name}</div>
-                                <div style={{ fontSize: '1.2rem', color: 'var(--marvel-yellow)' }}>{p.points} VP</div>
-                                <div style={{ fontSize: '0.9rem', color: '#aaa' }}>{p.tableau.length} Cards</div>
+                <>
+                    {/* Persistent Floating Button to Re-open Results */}
+                    {!showResults && (
+                        <div style={{
+                            position: 'fixed', top: '10px', left: '50%', transform: 'translateX(-50%)',
+                            zIndex: 3000, background: 'rgba(0,0,0,0.8)', padding: '10px 20px',
+                            borderRadius: '20px', border: '1px solid gold',
+                            display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 0 10px gold'
+                        }}>
+                            <span style={{ color: 'gold', fontWeight: 'bold' }}>Game Over - {state.winner} Wins!</span>
+                            <button onClick={() => setShowResults(true)} className="btn-primary" style={{ fontSize: '0.8rem', padding: '5px 10px' }}>
+                                View Results
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Results Modal */}
+                    {showResults && (
+                        <div style={{
+                            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                            background: 'rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 2000
+                        }}>
+                            <h1 style={{ fontSize: '4rem', color: 'gold', textShadow: '0 0 20px orange', marginBottom: '20px' }}>Game Over!</h1>
+                            <h2 style={{ fontSize: '2rem', color: 'white', marginBottom: '40px' }}>{state.winner} Wins!</h2>
+                            <div style={{ display: 'flex', gap: '20px' }}>
+                                {state.players.map(p => (
+                                    <div key={p.id} style={{
+                                        background: p.name === state.winner ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.1)',
+                                        padding: '20px', borderRadius: '10px', border: p.name === state.winner ? '2px solid gold' : '1px solid #444',
+                                        textAlign: 'center'
+                                    }}>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '10px' }}>{p.name}</div>
+                                        <div style={{ fontSize: '1.2rem', color: 'var(--marvel-yellow)' }}>{p.points} VP</div>
+                                        <div style={{ fontSize: '0.9rem', color: '#aaa' }}>{p.tableau.length} Cards</div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                    <button onClick={() => {
-                        sessionStorage.removeItem('splendor_gameState');
-                        sessionStorage.removeItem('splendor_host');
-                        sessionStorage.removeItem('splendor_gameId');
-                        window.location.reload();
-                    }} style={{ marginTop: '50px', padding: '15px 30px', fontSize: '1.2rem', cursor: 'pointer', background: 'var(--marvel-blue)', color: 'white', border: 'none', borderRadius: '5px' }}>
-                        Return to Lobby
-                    </button>
-                </div>
+                            <div style={{ marginTop: '50px', display: 'flex', gap: '20px' }}>
+                                <button onClick={() => setShowResults(false)} style={{ padding: '15px 30px', fontSize: '1.2rem', cursor: 'pointer', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '5px' }}>
+                                    View Board
+                                </button>
+                                <button onClick={() => {
+                                    sessionStorage.removeItem('splendor_gameState');
+                                    sessionStorage.removeItem('splendor_host');
+                                    sessionStorage.removeItem('splendor_gameId');
+                                    window.location.reload();
+                                }} style={{ padding: '15px 30px', fontSize: '1.2rem', cursor: 'pointer', background: 'var(--marvel-blue)', color: 'white', border: 'none', borderRadius: '5px' }}>
+                                    Return to Lobby
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
