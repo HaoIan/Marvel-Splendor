@@ -28,18 +28,34 @@ const Token = ({ color, count, onClick }: { color: keyof TokenBank, count: numbe
 const CardView = ({ card, onClick, disabled, canAfford }: { card: CardType, onClick: () => void, disabled?: boolean, canAfford?: boolean }) => {
     const bgImage = card.imageUrl || `/assets/hero-tier-${card.tier}.png`;
     const [animate, setAnimate] = useState(true);
+    const [animDelay, setAnimDelay] = useState('0s');
 
     useEffect(() => {
-        // Animation runs on mount. We can remove the class after animation if needed, 
-        // but keeping it is fine as long as we don't re-add it.
-        // Actually, if the key changes, the component remounts and `animate` resets to true.
-        // If the key stays same, `animate` stays false (after we set it false).
-        const timer = setTimeout(() => setAnimate(false), 500); // Match CSS animation duration
+        // Match CSS animation duration
+        const timer = setTimeout(() => setAnimate(false), 500);
         return () => clearTimeout(timer);
     }, []);
 
+    // Sync animation delay when 'canAfford' changes
+    useEffect(() => {
+        if (canAfford) {
+            // Calculate delay to sync with global 2s cycle
+            // Use negative delay to start animation at correct phase immediately
+            const delay = -(Date.now() % 2000) + 'ms';
+            setAnimDelay(delay);
+        }
+    }, [canAfford]);
+
     return (
-        <div className={`card ${card.bonus} ${canAfford ? 'affordable' : ''} ${animate ? 'card-enter' : ''} ${disabled ? 'disabled' : ''}`} onClick={disabled ? undefined : onClick} style={{ cursor: disabled ? 'default' : 'pointer', backgroundImage: `url(${bgImage})` }}>
+        <div
+            className={`card ${card.bonus} ${canAfford ? 'affordable' : ''} ${animate ? 'card-enter' : ''} ${disabled ? 'disabled' : ''}`}
+            onClick={disabled ? undefined : onClick}
+            style={{
+                cursor: disabled ? 'default' : 'pointer',
+                backgroundImage: `url(${bgImage})`,
+                animationDelay: canAfford ? animDelay : '0s'
+            }}
+        >
             <div className="card-header">
                 <span className="card-points">{card.points || ''}</span>
                 {card.tier === 3 && (
@@ -138,10 +154,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const [selectedTokens, setSelectedTokens] = useState<Partial<TokenBank>>({});
     const [selectedCard, setSelectedCard] = useState<CardType | null>(null); // For Modal
     const [animations, setAnimations] = useState<AnimationItem[]>([]);
+    const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
 
     // Track previous market state to detect new cards
     const prevMarketRef = React.useRef(state.market);
-    useEffect(() => {
+    // Use useLayoutEffect to hide cards BEFORE paint to prevent flash
+    React.useLayoutEffect(() => {
         const prevMarket = prevMarketRef.current;
         (['1', '2', '3'] as const).forEach(tStr => {
             const tier = parseInt(tStr) as 1 | 2 | 3;
@@ -155,20 +173,28 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 // Determine if this is a refill (only animate if deck is not empty or we just want to animate anyway)
                 // Actually we always want to animate if it appeared in the market.
                 // But we need to make sure the elements exist.
-                // Use a slight delay to allow React to render the new card slot.
-                setTimeout(() => {
-                    const deckId = `deck-tier-${tier}`;
-                    const cardId = `market-card-${card.id}`;
-                    // For flip animation: content = front face, backContent = card back
-                    const frontImage = card.imageUrl || `/assets/hero-tier-${card.tier}.png`;
-                    triggerAnimation('card', frontImage, deckId, cardId, CARD_BACKS[tier]);
-                }, 100);
+
+                const deckId = `deck-tier-${tier}`;
+                const cardId = `market-card-${card.id}`;
+                // For flip animation: content = front face, backContent = card back
+                const frontImage = card.imageUrl || `/assets/hero-tier-${card.tier}.png`;
+
+                // Hide the real card immediately (synchronously before paint)
+                setHiddenCardIds(prev => new Set(prev).add(card.id));
+
+                // Trigger animation in next frame to allow layout to settle if needed, 
+                // but since we are just hiding, the element ID still exists (it's properties that changed).
+                // Actually, if we hide it, we replace it with a placeholder div with the SAME ID (see render loop).
+                // So the ID is present in the DOM.
+                requestAnimationFrame(() => {
+                    triggerAnimation('card', frontImage, deckId, cardId, CARD_BACKS[tier], card.id);
+                });
             });
         });
         prevMarketRef.current = state.market;
     }, [state.market]);
 
-    const triggerAnimation = (type: 'token' | 'card', content: string, startId: string, endId: string, backContent?: string) => {
+    const triggerAnimation = (type: 'token' | 'card', content: string, startId: string, endId: string, backContent?: string, relatedCardId?: string) => {
         const startEl = document.getElementById(startId);
         const endEl = document.getElementById(endId);
         if (!startEl || !endEl) return;
@@ -205,14 +231,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             startRect,
             endRect,
             duration: 800, // 0.8s flight
-            backContent // Optional for flip
+            backContent, // Optional for flip
+            relatedCardId
         };
-
         setAnimations(prev => [...prev, newItem]);
     };
 
     const handleAnimationComplete = (id: string) => {
-        setAnimations(prev => prev.filter(a => a.id !== id));
+        setAnimations(prev => {
+            const completed = prev.find(a => a.id === id);
+            if (completed && completed.relatedCardId) {
+                setHiddenCardIds(current => {
+                    const next = new Set(current);
+                    next.delete(completed.relatedCardId!);
+                    return next;
+                });
+            }
+            return prev.filter(a => a.id !== id);
+        });
     };
 
     // Reset selected tokens when turn changes
@@ -427,31 +463,40 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 <div className="market-grid">
                     {[3, 2, 1].map(tier => (
                         <div key={tier} className="card-row">
-                            {/* Deck Back */}
-                            <div id={`deck-tier-${tier}`} className="card" style={{
-                                backgroundImage: `url(${CARD_BACKS[tier]})`,
-                                backgroundSize: '200%', // Zoom in to remove transparent padding
-                                display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}>
+                            {/* Deck Count & Back */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{
-                                    background: 'rgba(0,0,0,0.7)',
-                                    padding: '5px 10px',
-                                    borderRadius: '15px',
-                                    border: '1px solid rgba(255,255,255,0.3)',
                                     display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                    boxShadow: '0 2px 5px rgba(0,0,0,0.5)'
+                                    color: '#aaa', fontSize: '0.8rem', width: '40px'
                                 }}>
-                                    <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', lineHeight: '1' }}>
+                                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'white' }}>
                                         {state.decks[tier as 1 | 2 | 3].length}
                                     </span>
-                                    <span style={{ fontSize: '0.7rem', color: '#aaa', marginTop: '2px' }}>cards left</span>
+                                    <span>left</span>
                                 </div>
+                                {state.decks[tier as 1 | 2 | 3].length > 0 ? (
+                                    <div id={`deck-tier-${tier}`} className="card" style={{
+                                        backgroundImage: `url(${CARD_BACKS[tier]})`,
+                                        backgroundSize: '200%', // Zoom in to remove transparent padding
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    }}>
+                                        {/* Content removed, now just the back image */}
+                                    </div>
+                                ) : (
+                                    <div style={{ width: '120px', height: '168px', border: '1px dashed #333', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444' }}>
+                                        Empty
+                                    </div>
+                                )}
                             </div>
 
                             {/* Visible Cards */}
                             {state.market[tier as 1 | 2 | 3].map(card => (
                                 <div key={card.id} id={`market-card-${card.id}`}>
-                                    <CardView card={card} onClick={() => handleCardClick(card)} canAfford={canAfford(card)} />
+                                    {hiddenCardIds.has(card.id) ? (
+                                        <div style={{ width: '120px', height: '168px' }}></div> // Transparent placeholder
+                                    ) : (
+                                        <CardView card={card} onClick={() => handleCardClick(card)} canAfford={canAfford(card)} />
+                                    )}
                                 </div>
                             ))}
                         </div>

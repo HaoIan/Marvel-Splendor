@@ -9,6 +9,7 @@ export interface AnimationItem {
     startRect: DOMRect;
     endRect: DOMRect;
     duration: number;
+    relatedCardId?: string;
 }
 
 interface AnimationOverlayProps {
