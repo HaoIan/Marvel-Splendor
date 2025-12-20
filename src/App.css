@@ -237,7 +237,7 @@ body {
   background-position: center;
 }
 
-.card:hover {
+.card:not(.disabled):hover {
   z-index: 10;
   transform: scale(1.1);
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
@@ -431,4 +431,26 @@ body {
 
 .card-enter {
   animation: card-enter 0.5s ease-out forwards;
+}
+
+.animation-overlay-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.flying-token {
+  box-shadow: 0 0 15px currentColor, 0 0 5px white !important;
+  z-index: 10000;
+}
+
+.refill-enter {
+  opacity: 0;
+  animation: card-enter 1s ease-out forwards;
+  animation-delay: 0.8s;
+  /* Time for the flying token to get there and flip */
 }

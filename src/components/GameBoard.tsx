@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import type { GameState, Card as CardType, TokenBank, Player, Cost } from '../types';
 import type { GameAction } from '../hooks/gameReducer';
+import { AnimationOverlay, type AnimationItem } from './AnimationOverlay';
+import { v4 as uuidv4 } from 'uuid';
 import cardBack1 from '../assets/card-back-1.png';
 import cardBack2 from '../assets/card-back-2.png';
 import cardBack3 from '../assets/card-back-3.png';
@@ -14,6 +16,7 @@ const CARD_BACKS: Record<number, string> = {
 // Sub-components
 const Token = ({ color, count, onClick }: { color: keyof TokenBank, count: number, onClick?: () => void }) => (
     <div
+        id={onClick ? `token-bank-${color}` : undefined} // ID for animation source
         className={`token ${color}`}
         onClick={onClick}
         style={{ opacity: count > 0 ? 1 : 0.5, pointerEvents: count > 0 ? 'auto' : 'none' }}
@@ -36,7 +39,7 @@ const CardView = ({ card, onClick, disabled, canAfford }: { card: CardType, onCl
     }, []);
 
     return (
-        <div className={`card ${card.bonus} ${canAfford ? 'affordable' : ''} ${animate ? 'card-enter' : ''}`} onClick={disabled ? undefined : onClick} style={{ cursor: disabled ? 'default' : 'pointer', backgroundImage: `url(${bgImage})` }}>
+        <div className={`card ${card.bonus} ${canAfford ? 'affordable' : ''} ${animate ? 'card-enter' : ''} ${disabled ? 'disabled' : ''}`} onClick={disabled ? undefined : onClick} style={{ cursor: disabled ? 'default' : 'pointer', backgroundImage: `url(${bgImage})` }}>
             <div className="card-header">
                 <span className="card-points">{card.points || ''}</span>
                 {card.tier === 3 && (
@@ -70,7 +73,7 @@ const CardView = ({ card, onClick, disabled, canAfford }: { card: CardType, onCl
 };
 
 const PlayerArea = ({ player, isActive, onCardClick, isMe }: { player: Player, isActive: boolean, onCardClick: (card: CardType) => void, isMe?: boolean }) => (
-    <div className={`player-card ${isActive ? 'active-turn' : ''}`}>
+    <div id={`player-area-${player.id}`} className={`player-card ${isActive ? 'active-turn' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: '1rem' }}>{player.name} {isMe ? <span style={{ color: 'var(--marvel-blue)', fontSize: '0.8rem' }}>(You)</span> : ''} {isActive ? '★' : ''}</h3>
             <div style={{ fontWeight: 'bold', color: 'var(--marvel-yellow)' }}>{player.points} VP</div>
@@ -134,6 +137,83 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const isMyTurn = state.players[state.currentPlayerIndex].id === myPeerId || (myPeerId === null && state.currentPlayerIndex === 0);
     const [selectedTokens, setSelectedTokens] = useState<Partial<TokenBank>>({});
     const [selectedCard, setSelectedCard] = useState<CardType | null>(null); // For Modal
+    const [animations, setAnimations] = useState<AnimationItem[]>([]);
+
+    // Track previous market state to detect new cards
+    const prevMarketRef = React.useRef(state.market);
+    useEffect(() => {
+        const prevMarket = prevMarketRef.current;
+        (['1', '2', '3'] as const).forEach(tStr => {
+            const tier = parseInt(tStr) as 1 | 2 | 3;
+            const currentCards = state.market[tier];
+            const prevCards = prevMarket[tier];
+
+            // Find cards that are in current but not in prev
+            const newCards = currentCards.filter(c => !prevCards.some(pc => pc.id === c.id));
+
+            newCards.forEach(card => {
+                // Determine if this is a refill (only animate if deck is not empty or we just want to animate anyway)
+                // Actually we always want to animate if it appeared in the market.
+                // But we need to make sure the elements exist.
+                // Use a slight delay to allow React to render the new card slot.
+                setTimeout(() => {
+                    const deckId = `deck-tier-${tier}`;
+                    const cardId = `market-card-${card.id}`;
+                    // For flip animation: content = front face, backContent = card back
+                    const frontImage = card.imageUrl || `/assets/hero-tier-${card.tier}.png`;
+                    triggerAnimation('card', frontImage, deckId, cardId, CARD_BACKS[tier]);
+                }, 100);
+            });
+        });
+        prevMarketRef.current = state.market;
+    }, [state.market]);
+
+    const triggerAnimation = (type: 'token' | 'card', content: string, startId: string, endId: string, backContent?: string) => {
+        const startEl = document.getElementById(startId);
+        const endEl = document.getElementById(endId);
+        if (!startEl || !endEl) return;
+
+        const startRect = startEl.getBoundingClientRect();
+        const endRectRaw = endEl.getBoundingClientRect();
+
+        // Calculate a centered target rect to avoid expanding to the full container size
+        // If animating to market (endId includes 'market-card'), use full size (120x168)
+        // If token, use 35x35. Else (player area), use 60x84.
+        const isMarketCard = endId.includes('market-card');
+
+        const targetWidth = type === 'token' ? 35 : (isMarketCard ? 120 : 60);
+        const targetHeight = type === 'token' ? 35 : (isMarketCard ? 168 : 84);
+        const centerX = endRectRaw.left + endRectRaw.width / 2;
+        const centerY = endRectRaw.top + endRectRaw.height / 2;
+
+        const endRect = {
+            left: centerX - targetWidth / 2,
+            top: centerY - targetHeight / 2,
+            width: targetWidth,
+            height: targetHeight,
+            bottom: centerY + targetHeight / 2,
+            right: centerX + targetWidth / 2,
+            x: centerX - targetWidth / 2,
+            y: centerY - targetHeight / 2,
+            toJSON: () => { }
+        } as DOMRect;
+
+        const newItem: AnimationItem = {
+            id: uuidv4(),
+            type,
+            content,
+            startRect,
+            endRect,
+            duration: 800, // 0.8s flight
+            backContent // Optional for flip
+        };
+
+        setAnimations(prev => [...prev, newItem]);
+    };
+
+    const handleAnimationComplete = (id: string) => {
+        setAnimations(prev => prev.filter(a => a.id !== id));
+    };
 
     // Reset selected tokens when turn changes
     useEffect(() => {
@@ -196,6 +276,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             type: 'TAKE_TOKENS',
             tokens: { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0, green: 0, gray: 0, ...selectedTokens }
         });
+
+        // Trigger Animations
+        const playerId = state.players[state.currentPlayerIndex].id;
+        Object.entries(selectedTokens).forEach(([color, count]) => {
+            if (count && count > 0) {
+                for (let i = 0; i < count; i++) {
+                    // Stagger slightly?
+                    setTimeout(() => {
+                        triggerAnimation('token', color, `token-bank-${color}`, `player-area-${playerId}`);
+                    }, i * 100);
+                }
+            }
+        });
+
         setSelectedTokens({});
         dispatch({ type: 'END_TURN' });
     };
@@ -233,10 +327,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
     const handleAction = (type: 'RECRUIT' | 'RESERVE') => {
         if (!selectedCard) return;
+
+        const playerId = state.players[state.currentPlayerIndex].id;
+        // We need an ID for the card in the modal or market.
+        // Since modal is open, let's use a specific ID for the modal card view if possible, or just the market card.
+        // Actually, let's assume we animate from the Modal center.
+        // We can add an ID to the modal card view.
+
         if (type === 'RECRUIT') {
             dispatch({ type: 'RECRUIT_CARD', cardId: selectedCard.id });
+            triggerAnimation('card', selectedCard.imageUrl || '', 'modal-card-view', `player-area-${playerId}`);
         } else {
             dispatch({ type: 'RESERVE_CARD', cardId: selectedCard.id });
+            triggerAnimation('card', selectedCard.imageUrl || '', 'modal-card-view', `player-area-${playerId}`);
         }
         dispatch({ type: 'END_TURN' });
         setSelectedCard(null);
@@ -244,6 +347,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
     return (
         <div className="game-layout">
+            <AnimationOverlay items={animations} onComplete={handleAnimationComplete} />
             {/* Turn Indicator Overlay */}
             {isMyTurn && <div className="turn-indicator-overlay"></div>}
 
@@ -324,7 +428,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                     {[3, 2, 1].map(tier => (
                         <div key={tier} className="card-row">
                             {/* Deck Back */}
-                            <div className="card" style={{
+                            <div id={`deck-tier-${tier}`} className="card" style={{
                                 backgroundImage: `url(${CARD_BACKS[tier]})`,
                                 backgroundSize: '200%', // Zoom in to remove transparent padding
                                 display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -340,13 +444,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                     <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', lineHeight: '1' }}>
                                         {state.decks[tier as 1 | 2 | 3].length}
                                     </span>
-                                    <span style={{ fontSize: '0.6rem', color: '#aaa', textTransform: 'uppercase', marginTop: '2px' }}>Left</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#aaa', marginTop: '2px' }}>cards left</span>
                                 </div>
                             </div>
 
                             {/* Visible Cards */}
                             {state.market[tier as 1 | 2 | 3].map(card => (
-                                <CardView key={card.id} card={card} onClick={() => handleCardClick(card)} canAfford={canAfford(card)} />
+                                <div key={card.id} id={`market-card-${card.id}`}>
+                                    <CardView card={card} onClick={() => handleCardClick(card)} canAfford={canAfford(card)} />
+                                </div>
                             ))}
                         </div>
                     ))}
@@ -370,7 +476,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                     <div className="glass-panel" style={{ textAlign: 'center', border: '1px solid var(--marvel-blue)', boxShadow: '0 0 30px var(--marvel-blue)' }}>
                         <h3>Selected Card</h3>
                         <div style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
-                            <div style={{ transform: 'scale(1.5)', margin: '30px' }}>
+                            <div id="modal-card-view" style={{ transform: 'scale(1.5)', margin: '30px' }}>
                                 <CardView card={selectedCard} onClick={() => { }} disabled />
                             </div>
                         </div>
@@ -447,7 +553,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                             </button>
                                         )}
                                         {!isReserved && (
-                                            <button className="btn-primary" style={{ filter: 'hue-rotate(90deg)' }} onClick={() => handleAction('RESERVE')}>Reserve</button>
+                                            player.hand.length < 3 ? (
+                                                <button className="btn-primary" style={{ filter: 'hue-rotate(90deg)' }} onClick={() => handleAction('RESERVE')}>Reserve</button>
+                                            ) : (
+                                                <button disabled style={{ padding: '12px 24px', background: '#555', color: '#aaa', border: 'none', borderRadius: '8px', cursor: 'not-allowed' }}>
+                                                    Max Reserved (3)
+                                                </button>
+                                            )
                                         )}
                                     </>
                                 );
@@ -491,4 +603,4 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             )}
         </div>
     );
-};
+}; 
