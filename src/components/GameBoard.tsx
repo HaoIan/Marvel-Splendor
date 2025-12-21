@@ -132,8 +132,10 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate }: { card: Car
 const PlayerArea = ({ player, isActive, onCardClick, isMe }: { player: Player, isActive: boolean, onCardClick: (card: CardType) => void, isMe?: boolean }) => (
     <div id={`player-area-${player.id}`} className={`player-card ${isActive ? 'active-turn' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>{player.name} {isMe ? <span style={{ color: 'var(--marvel-blue)', fontSize: '0.8rem' }}>(You)</span> : ''} {isActive ? '★' : ''}</h3>
-            <div style={{ fontWeight: 'bold', color: 'var(--marvel-yellow)' }}>{player.points} VP</div>
+            <h3 style={{ margin: 0, fontSize: '1rem', color: isActive ? 'var(--marvel-green)' : 'inherit', textShadow: isActive ? '0 0 10px var(--marvel-green)' : 'none' }}>
+                {player.name} {isMe ? <span style={{ color: 'var(--marvel-blue)', fontSize: '0.8rem' }}>(You)</span> : ''}
+            </h3>
+            <div style={{ fontWeight: 'bold', color: 'var(--marvel-yellow)' }}>{player.points} Victory Points</div>
         </div>
 
         {/* Tokens */}
@@ -699,8 +701,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 <div style={{
                     position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
                     background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-                }}>
-                    <div className="glass-panel" style={{ textAlign: 'center', border: '1px solid var(--marvel-blue)', boxShadow: '0 0 30px var(--marvel-blue)' }}>
+                }} onClick={() => setSelectedCard(null)}>
+                    <div className="glass-panel" style={{ textAlign: 'center', border: '1px solid var(--marvel-blue)', boxShadow: '0 0 30px var(--marvel-blue)' }} onClick={e => e.stopPropagation()}>
                         <h3>Selected Card</h3>
                         <div style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
                             <div id="modal-card-view" style={{ transform: 'scale(1.5)', margin: '30px' }}>
@@ -871,7 +873,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                         textAlign: 'center'
                                     }}>
                                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '10px' }}>{p.name}</div>
-                                        <div style={{ fontSize: '1.2rem', color: 'var(--marvel-yellow)' }}>{p.points} VP</div>
+                                        <div style={{ fontSize: '1.2rem', color: 'var(--marvel-yellow)' }}>{p.points} Victory Points</div>
                                         <div style={{ fontSize: '0.9rem', color: '#aaa' }}>{p.tableau.length} Cards</div>
                                     </div>
                                 ))}
