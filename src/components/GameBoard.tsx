@@ -257,6 +257,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     // Track notified players for win condition to prevent spam
     const notifiedWinnersRef = useRef<Set<string>>(new Set());
 
+    // Track cards that have just arrived via animation to suppress default entry animation
+    const justArrivedIdsRef = useRef<Set<string>>(new Set());
+
     // Check for winning condition (>= 16 points AND has Time Stone)
     useEffect(() => {
         state.players.forEach(p => {
@@ -300,6 +303,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 // but since we are just hiding, the element ID still exists (it's properties that changed).
                 // Actually, if we hide it, we replace it with a placeholder div with the SAME ID (see render loop).
                 // So the ID is present in the DOM.
+                justArrivedIdsRef.current.add(card.id);
                 requestAnimationFrame(() => {
                     triggerAnimation('card', frontImage, deckId, cardId, CARD_BACKS[tier], card.id);
                 });
@@ -679,7 +683,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                     {hiddenCardIds.has(card.id) ? (
                                         <div style={{ width: '120px', height: '168px' }}></div> // Transparent placeholder
                                     ) : (
-                                        <CardView card={card} onClick={() => handleCardClick(card)} canAfford={canAfford(card)} />
+                                        <CardView card={card} onClick={() => handleCardClick(card)} canAfford={canAfford(card)} noAnimate={justArrivedIdsRef.current.has(card.id)} />
                                     )}
                                 </div>
                             ))}
