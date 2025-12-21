@@ -283,14 +283,19 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                         return a.tableau.length - b.tableau.length; // Fewer cards is better
                     });
 
-                    const winner = sortedPlayers[0];
+                    const winners = sortedPlayers.filter(p =>
+                        p.points === sortedPlayers[0].points &&
+                        p.tableau.length === sortedPlayers[0].tableau.length
+                    );
+
+                    const winnerNames = winners.map(p => p.name).join(' & ');
 
                     return {
                         ...nextState,
                         currentPlayerIndex: nextIndex, // Reset to 0 just in case
-                        winner: winner.name,
+                        winner: winnerNames,
                         status: 'GAME_OVER',
-                        logs: [...nextState.logs, `Round Complete. GAME OVER! ${winner.name} WINS with ${winner.points} points!`]
+                        logs: [...nextState.logs, `Round Complete. GAME OVER! ${winnerNames} WINS with ${winners[0].points} points!`]
                     };
                 }
             }
