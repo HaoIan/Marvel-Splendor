@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { GameState, Card as CardType, TokenBank, Player, Cost } from '../types';
 import type { GameAction } from '../hooks/gameReducer';
 import { AnimationOverlay, type AnimationItem } from './AnimationOverlay';
+import { useSoundEffects } from '../hooks/useSoundEffects'; // Import Sound Hook
 import { v4 as uuidv4 } from 'uuid';
 import cardBack1 from '../assets/card-back-1.png';
 import cardBack2 from '../assets/card-back-2.png';
@@ -230,6 +231,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const [toast, setToast] = useState<{ message: string, type: 'error' | 'info' } | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string, onConfirm: () => void } | null>(null);
 
+    // Sound Effects
+    const { playTokenSound, playRecruitSound, playReserveSound, playCardFlipSound, playErrorSound, playVictorySound } = useSoundEffects();
+
+
     // Auto-clear toast
     useEffect(() => {
         if (toast) {
@@ -275,6 +280,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         });
     }, [state.players, state.status]);
 
+    // Play Victory Sound on Game Over
+    useEffect(() => {
+        if (state.status === 'GAME_OVER') {
+            playVictorySound();
+        }
+    }, [state.status, playVictorySound]);
+
     // Use useLayoutEffect to hide cards BEFORE paint to prevent flash
     React.useLayoutEffect(() => {
         const prevMarket = prevMarketRef.current;
@@ -305,6 +317,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 // So the ID is present in the DOM.
                 justArrivedIdsRef.current.add(card.id);
                 requestAnimationFrame(() => {
+                    playCardFlipSound(); // Sound on flip
                     triggerAnimation('card', frontImage, deckId, cardId, CARD_BACKS[tier], card.id);
                 });
             });
@@ -400,24 +413,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         if (newCount === 2) {
             if (state.tokens[color] < 4) {
                 setToast({ message: "Cannot take 2 of this color (less than 4 in bank).", type: 'error' });
+                playErrorSound();
                 return;
             }
             if (totalSelected > 1) {
                 setToast({ message: "Cannot take 2 of same color if you have other colors selected.", type: 'error' });
+                playErrorSound();
                 return;
             }
+            playTokenSound();
             currentSelection[color] = 2;
             setSelectedTokens(currentSelection);
         } else if (newCount === 1) {
             const hasDouble = Object.values(currentSelection).some(v => v === 2);
             if (hasDouble) {
                 setToast({ message: "Cannot take different colors if you selected 2 of the same.", type: 'error' });
+                playErrorSound();
                 return;
             }
             if (distinctColors >= 3) {
                 setToast({ message: "Max 3 distinct tokens.", type: 'error' });
+                playErrorSound();
                 return;
             }
+            playTokenSound();
             currentSelection[color] = 1;
             setSelectedTokens(currentSelection);
         }
@@ -455,6 +474,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 }
             }
         });
+        playTokenSound(); // Confirm sound
 
         setSelectedTokens({});
         dispatch({ type: 'END_TURN' });
@@ -494,10 +514,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const handleAction = (type: 'RECRUIT' | 'RESERVE') => {
         if (state.status === 'GAME_OVER') {
             setToast({ message: "The game has ended. You cannot make moves.", type: 'info' });
+            playErrorSound();
             return;
         }
         if (!isMyTurn) {
             setToast({ message: "It is not your turn!", type: 'error' });
+            playErrorSound();
             return;
         }
         if (!selectedCard) return;
@@ -510,9 +532,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
         if (type === 'RECRUIT') {
             dispatch({ type: 'RECRUIT_CARD', cardId: selectedCard.id });
+            playRecruitSound();
             triggerAnimation('card', selectedCard.imageUrl || '', 'modal-card-view', `player-area-${playerId}`);
         } else {
             dispatch({ type: 'RESERVE_CARD', cardId: selectedCard.id });
+            playReserveSound();
             triggerAnimation('card', selectedCard.imageUrl || '', 'modal-card-view', `player-area-${playerId}`);
         }
         dispatch({ type: 'END_TURN' });
