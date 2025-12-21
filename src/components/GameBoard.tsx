@@ -190,12 +190,31 @@ interface GameBoardProps {
     state: GameState;
     dispatch: (action: GameAction) => void;
     myPeerId: string | null;
+    myUUID?: string | null; // Added for robust identity check
     closeLobby?: () => void;
     isHost?: boolean;
 }
 
-export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId, closeLobby, isHost }) => {
+export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId, myUUID, closeLobby, isHost }) => {
     const isMyTurn = state.players[state.currentPlayerIndex].id === myPeerId || (myPeerId === null && state.currentPlayerIndex === 0);
+
+    // Determine the viewing player (Me in multiplayer, or Current Player in hotseat)
+    // Priority: 1. Match by ID (PeerID), 2. Match by UUID (Persistent Session), 3. Active Player
+    const viewingPlayerIndex = (() => {
+        if (myPeerId) {
+            const byId = state.players.findIndex(p => p.id === myPeerId);
+            if (byId !== -1) return byId;
+        }
+        if (myUUID) {
+            const byUUID = state.players.findIndex(p => p.uuid === myUUID);
+            if (byUUID !== -1) return byUUID;
+        }
+        return state.currentPlayerIndex;
+    })();
+
+    const viewingPlayer = state.players[viewingPlayerIndex] || state.players[state.currentPlayerIndex];
+
+
     const [selectedTokens, setSelectedTokens] = useState<Partial<TokenBank>>({});
     const [selectedCard, setSelectedCard] = useState<CardType | null>(null); // For Modal
     const [animations, setAnimations] = useState<AnimationItem[]>([]);
@@ -349,11 +368,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         setSelectedTokens({});
     }, [state.currentPlayerIndex]);
 
-    // Split players for left/right panels - DEPRECATED
-    // const midPoint = Math.ceil(state.players.length / 2);
-    // const leftPlayers = state.players.slice(0, midPoint);
-    // const rightPlayers = state.players.slice(midPoint);
-
     const handleTakeToken = (color: keyof TokenBank) => {
         if (state.status === 'GAME_OVER') {
             setToast({ message: "Game is over!", type: 'info' });
@@ -448,7 +462,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     // Validation for Recruitment
     const canAfford = (card: CardType) => {
         // Allow check anytime so we can see costs
-        const player = state.players[state.currentPlayerIndex];
+        const player = viewingPlayer;
 
         // Calculate Cost
         const discount: Record<string, number> = { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0 };
@@ -695,7 +709,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         </div>
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                             {(() => {
-                                const player = state.players[state.currentPlayerIndex];
+                                const player = viewingPlayer;
                                 const isOwned = player.tableau.some(c => c.id === selectedCard.id);
                                 const isReserved = player.hand.some(c => c.id === selectedCard.id);
 

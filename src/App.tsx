@@ -136,6 +136,7 @@ function App() {
           state={state}
           dispatch={dispatch}
           myPeerId={myPlayerId || (isLocal ? state.players[state.currentPlayerIndex].id : null)}
+          myUUID={playerUUID}
           closeLobby={closeLobby}
           isHost={mpState.isHost}
         />
