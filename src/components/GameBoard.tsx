@@ -67,7 +67,7 @@ const Token = ({ color, count, onClick, size = 100, style }: { color: keyof Toke
     </div>
 );
 
-const CardView = ({ card, onClick, disabled, canAfford, noAnimate }: { card: CardType, onClick: () => void, disabled?: boolean, canAfford?: boolean, noAnimate?: boolean }) => {
+const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: { card: CardType, onClick: () => void, disabled?: boolean, canAfford?: boolean, noAnimate?: boolean, hideName?: boolean }) => {
     const bgImage = card.imageUrl || `/assets/hero-tier-${card.tier}.png`;
     const [animate, setAnimate] = useState(!noAnimate);
     const [animDelay, setAnimDelay] = useState('0s');
@@ -116,7 +116,17 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate }: { card: Car
                     amt > 0 ? <div key={color} className={`cost-bubble ${color}`}>{amt}</div> : null
                 ))}
             </div>
-        </div >
+            {card.name && !hideName && (
+                <div style={{
+                    position: 'absolute', bottom: '2px', right: '2px',
+                    fontSize: '0.6rem', background: 'rgba(0,0,0,0.7)', padding: '1px 3px', borderRadius: '3px',
+                    maxWidth: '65px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    textShadow: '0 1px 1px black'
+                }}>
+                    {card.name}
+                </div>
+            )}
+        </div>
     );
 };
 
@@ -724,7 +734,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         <h3>{selectedCard.name || 'Selected Card'}</h3>
                         <div style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
                             <div id="modal-card-view" style={{ transform: 'scale(1.5)', margin: '30px' }}>
-                                <CardView card={selectedCard} onClick={() => { }} disabled noAnimate />
+                                <CardView card={selectedCard} onClick={() => { }} disabled noAnimate hideName />
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
