@@ -116,17 +116,7 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate }: { card: Car
                     amt > 0 ? <div key={color} className={`cost-bubble ${color}`}>{amt}</div> : null
                 ))}
             </div>
-            {card.name && (
-                <div style={{
-                    position: 'absolute', bottom: '2px', right: '2px',
-                    fontSize: '0.6rem', background: 'rgba(0,0,0,0.7)', padding: '1px 3px', borderRadius: '3px',
-                    maxWidth: '65px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    textShadow: '0 1px 1px black'
-                }}>
-                    {card.name}
-                </div>
-            )}
-        </div>
+        </div >
     );
 };
 
@@ -731,7 +721,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                     background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
                 }} onClick={() => setSelectedCard(null)}>
                     <div className="glass-panel" style={{ textAlign: 'center', border: '1px solid var(--marvel-blue)', boxShadow: '0 0 30px var(--marvel-blue)' }} onClick={e => e.stopPropagation()}>
-                        <h3>Selected Card</h3>
+                        <h3>{selectedCard.name || 'Selected Card'}</h3>
                         <div style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
                             <div id="modal-card-view" style={{ transform: 'scale(1.5)', margin: '30px' }}>
                                 <CardView card={selectedCard} onClick={() => { }} disabled noAnimate />
