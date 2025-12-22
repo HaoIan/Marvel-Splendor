@@ -199,7 +199,11 @@ interface GameBoardProps {
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId, myUUID, closeLobby, isHost }) => {
-    const isMyTurn = state.players[state.currentPlayerIndex].id === myPeerId || (myPeerId === null && state.currentPlayerIndex === 0);
+    // Determine isMyTurn: Match ID OR Match UUID (Persistent Session) OR (Hotseat & Player 0)
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    const isMyTurn = (currentPlayer.id === myPeerId) ||
+        (myUUID && currentPlayer.uuid === myUUID) ||
+        (myPeerId === null && state.currentPlayerIndex === 0);
 
     // Determine the viewing player (Me in multiplayer, or Current Player in hotseat)
     // Priority: 1. Match by ID (PeerID), 2. Match by UUID (Persistent Session), 3. Active Player

@@ -1,18 +1,27 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import Peer from 'peerjs';
-import type { DataConnection } from 'peerjs';
+import { io, Socket } from 'socket.io-client';
 import type { GameAction } from './gameReducer';
 import type { GameState } from '../types';
 
+// Server URL - Change this to your deployed server URL in production
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+
 export interface MultiplayerState {
-    peerId: string | null;
-    connectionStatus: 'idle' | 'host_waiting' | 'connecting' | 'connected' | 'error';
+    peerId: string | null;         // Socket ID
+    connectionStatus: 'idle' | 'connecting' | 'host_waiting' | 'connected' | 'error';
     isHost: boolean;
-    gameId: string | null;
-    connectedPeers: string[];
-    peerNames: Record<string, string>; // Map peerId -> name
-    peerUUIDs: Record<string, string>; // Map peerId -> uuid
+    gameId: string | null;         // Room code (e.g., "ABCD12")
+    connectedPeers: string[];      // UUIDs of connected players
+    peerNames: Record<string, string>; // UUID -> name
+    peerUUIDs: Record<string, string>; // Socket ID -> UUID (for compatibility)
     errorMessage?: string;
+}
+
+interface PlayerInfo {
+    socketId: string;
+    name: string;
+    uuid: string;
+    connected: boolean;
 }
 
 export const useMultiplayer = (
@@ -29,272 +38,198 @@ export const useMultiplayer = (
         peerUUIDs: {}
     });
 
-    const peerRef = useRef<Peer | null>(null);
-    const connectionsRef = useRef<DataConnection[]>([]); // Host: list of clients
-    const clientConnRef = useRef<DataConnection | null>(null); // Client: connection to host
-
-    // IMPORTANT: Track latest gameState in ref so event listeners (which are closures) can access it
+    const socketRef = useRef<Socket | null>(null);
     const gameStateRef = useRef(gameState);
+
     useEffect(() => {
         gameStateRef.current = gameState;
     }, [gameState]);
 
-    // Define connection logic as a stable function we can call from anywhere
-    const setupPeer = useCallback((requestedId?: string) => {
-        // Cleanup existing (if any) - though usually we call this on mount or after destroy
-        if (peerRef.current) {
-            peerRef.current.destroy();
-            peerRef.current = null;
-        }
+    // Connect to server
+    const connect = useCallback(() => {
+        if (socketRef.current?.connected) return;
 
-        const peer = requestedId ? new Peer(requestedId, { debug: 2 }) : new Peer({ debug: 2 });
-        peerRef.current = peer;
+        console.log('Connecting to server:', SERVER_URL);
+        const socket = io(SERVER_URL, {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
+        });
 
-        peer.on('open', (id) => {
-            console.log('Peer Opened:', id);
-            setMpState(prev => ({ ...prev, peerId: id, connectionStatus: 'idle', errorMessage: undefined }));
-            sessionStorage.setItem('splendor_peerId', id);
+        socketRef.current = socket;
 
-            // Access latest storage for recovery context
-            const savedIsHost = sessionStorage.getItem('splendor_isHost') === 'true';
-            const savedGameId = sessionStorage.getItem('splendor_gameId');
-            const savedName = sessionStorage.getItem('splendor_playerName');
+        socket.on('connect', () => {
+            console.log('Connected to server:', socket.id);
+            setMpState(prev => ({ ...prev, peerId: socket.id || null, errorMessage: undefined }));
+
+            // Check for saved session to rejoin
+            const savedRoomCode = sessionStorage.getItem('splendor_roomCode');
             const savedUUID = sessionStorage.getItem('splendor_playerUUID');
+            const savedName = sessionStorage.getItem('splendor_playerName');
 
-            // Auto-reconnect logic
-            // 1. If we were Host, and we successfully reclaimed our ID:
-            if (savedIsHost && savedGameId === id) {
-                console.log('Restoring Host Session');
-                setMpState(prev => ({
-                    ...prev,
-                    isHost: true,
-                    connectionStatus: 'host_waiting',
-                    gameId: id,
-                    peerNames: { ...prev.peerNames, [id]: savedName || 'Host' },
-                    peerUUIDs: { ...prev.peerUUIDs, [id]: savedUUID || '' }
-                }));
-            }
-            // 2. If we were Client (or Host who lost ID), and we have a target GameID:
-            else if (!savedIsHost && savedGameId) {
-                console.log('Restoring Client Session, reconnecting to:', savedGameId);
-                // We use a small timeout to let the UI settle or ensure peer is ready
-                setTimeout(() => {
-                    joinGame(savedGameId, savedName || 'Player', savedUUID || '');
-                }, 500);
+            if (savedRoomCode && savedUUID && savedName) {
+                console.log('Attempting to rejoin room:', savedRoomCode);
+                setMpState(prev => ({ ...prev, connectionStatus: 'connecting' }));
+                socket.emit('join-room', { roomCode: savedRoomCode, playerName: savedName, uuid: savedUUID });
             }
         });
 
-        peer.on('connection', (conn) => {
-            // Handle incoming connection (Host side)
-            console.log('Incoming connection:', conn.peer);
-            connectionsRef.current.push(conn);
-
-            conn.on('open', () => {
-                console.log('Connection opened with:', conn.peer);
-                setMpState(prev => ({
-                    ...prev,
-                    connectedPeers: [...prev.connectedPeers, conn.peer],
-                    connectionStatus: 'connected'
-                }));
-                // Send current state to new player - USE REF to get latest state!
-                conn.send({ type: 'SYNC_STATE', state: gameStateRef.current });
-            });
-
-            conn.on('data', (data: any) => {
-                if (data.type === 'PLAYER_HELLO') {
-                    const { name, id, uuid } = data;
-
-                    // Check for reconnection - USE REF
-                    const currentGameState = gameStateRef.current;
-                    const existingPlayer = currentGameState.players.find(p => p.uuid === uuid);
-
-                    if (existingPlayer && existingPlayer.id !== id) {
-                        console.log(`Player ${name} reconnected with new ID ${id} (old: ${existingPlayer.id})`);
-                        // Dispatch action to update player ID in game state
-                        dispatch({ type: 'RECONNECT_PLAYER', oldId: existingPlayer.id, newId: id });
-                    }
-
-                    setMpState(prev => ({
-                        ...prev,
-                        peerNames: { ...prev.peerNames, [id]: name },
-                        peerUUIDs: { ...prev.peerUUIDs, [id]: uuid }
-                    }));
-                } else if (data.type) {
-                    dispatch(data);
-                }
-            });
-
-            conn.on('close', () => {
-                connectionsRef.current = connectionsRef.current.filter(c => c !== conn);
-                setMpState(prev => ({
-                    ...prev,
-                    connectedPeers: prev.connectedPeers.filter(p => p !== conn.peer)
-                }));
-            });
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: 'Disconnected from server. Reconnecting...' }));
         });
 
-        peer.on('error', (err) => {
-            console.error('Peer Error:', err);
+        socket.on('connect_error', (err) => {
+            console.error('Connection error:', err);
+            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: `Connection failed: ${err.message}` }));
+        });
 
-            // AUTOMATIC RETRY ON UNAVAILABLE ID (Server thinks we are still online with old ID)
-            if (err.type === 'unavailable-id') {
-                console.warn('Peer ID taken/unavailable. Clearing stored ID and retrying with fresh ID...');
-                sessionStorage.removeItem('splendor_peerId');
-                setupPeer(undefined);
-                return;
-            }
+        // Room created (Host)
+        socket.on('room-created', ({ roomCode, players }: { roomCode: string; players: PlayerInfo[] }) => {
+            console.log('Room created:', roomCode);
+            sessionStorage.setItem('splendor_roomCode', roomCode);
+            sessionStorage.setItem('splendor_isHost', 'true');
 
-            // AUTOMATIC RETRY ON CONNECTION FAILURE (Host not found / Flaky signaling)
-            // If we are trying to join a game (we have a valid gameId we want to be connected to)
-            const targetGameId = sessionStorage.getItem('splendor_gameId'); // Or look at mpState, but mpState might not be updated inside closure if we didn't use Ref?
-            // Actually setupPeer recreates the closure, so it's fine? No, setupPeer is useCallback with [] dep (well, dispatch).
-            // But we can check sessionStorage for intent.
-            const isHost = sessionStorage.getItem('splendor_isHost') === 'true';
-
-            if (!isHost && targetGameId && (err.type === 'peer-unavailable' || err.message.includes('Could not connect'))) {
-                console.warn(`Connection to host ${targetGameId} failed. Retrying in 2s...`);
-
-                // Update state to show we are trying
-                setMpState(prev => ({
-                    ...prev,
-                    connectionStatus: 'connecting',
-                    errorMessage: `Connection failed. Retrying...`
-                }));
-
-                setTimeout(() => {
-                    // Retry joining
-                    joinGame(targetGameId, sessionStorage.getItem('splendor_playerName') || 'Player', sessionStorage.getItem('splendor_playerUUID') || '');
-                }, 2000);
-                return;
-            }
-
-            // SIGNALING SERVER DISCONNECTION (Host lost connection to broker)
-            if (err.type === 'network' || err.type === 'disconnected' || err.message.includes('Lost connection to server')) {
-                console.warn('Lost connection to Signaling Server. Attempting to reconnect...');
-                if (peer && !peer.destroyed) {
-                    peer.reconnect();
-                    return;
-                }
-            }
+            const names: Record<string, string> = {};
+            players.forEach(p => { names[p.uuid] = p.name; });
 
             setMpState(prev => ({
                 ...prev,
-                connectionStatus: 'error',
-                errorMessage: `Peer Error: ${err.type} - ${err.message}`
+                isHost: true,
+                connectionStatus: 'host_waiting',
+                gameId: roomCode,
+                peerNames: names,
+                connectedPeers: players.map(p => p.uuid)
             }));
         });
 
-        // Handle Disconnected Event (Signaling server lost, but P2P connections might be alive)
-        peer.on('disconnected', () => {
-            console.log('Peer disconnected from signaling server. Attempting reconnect...');
-            // We don't necessarily want to show an error yet if we can reconnect seamlessly
-            if (peer && !peer.destroyed) {
-                peer.reconnect();
-            }
-        });
-    }, [dispatch]); // Dependencies for setupPeer. Dispatch is stable.
+        // Room joined (Client or Reconnect)
+        socket.on('room-joined', ({ roomCode, players, isHost }: { roomCode: string; players: PlayerInfo[]; isHost: boolean }) => {
+            console.log('Joined room:', roomCode, 'isHost:', isHost);
+            sessionStorage.setItem('splendor_roomCode', roomCode);
+            sessionStorage.setItem('splendor_isHost', String(isHost));
 
-    // Initial Mount Setup
-    useEffect(() => {
-        const savedPeerId = sessionStorage.getItem('splendor_peerId');
-        // Initial setup attempts to reclaim ID if present
-        setupPeer(savedPeerId || undefined);
+            const names: Record<string, string> = {};
+            const myUUID = sessionStorage.getItem('splendor_playerUUID');
+            players.forEach(p => { names[p.uuid] = p.name; });
+
+            setMpState(prev => ({
+                ...prev,
+                isHost: isHost,
+                connectionStatus: isHost ? 'host_waiting' : 'connected',
+                gameId: roomCode,
+                peerNames: names,
+                connectedPeers: players.filter(p => p.uuid !== myUUID).map(p => p.uuid)
+            }));
+        });
+
+        // Player list updated
+        socket.on('player-list-updated', ({ players }: { players: PlayerInfo[] }) => {
+            const names: Record<string, string> = {};
+            const myUUID = sessionStorage.getItem('splendor_playerUUID');
+            players.forEach(p => { names[p.uuid] = p.name; });
+
+            setMpState(prev => ({
+                ...prev,
+                peerNames: names,
+                connectedPeers: players.filter(p => p.uuid !== myUUID).map(p => p.uuid)
+            }));
+        });
+
+        // State sync from server
+        socket.on('state-sync', ({ state }: { state: GameState }) => {
+            console.log('Received state sync');
+            dispatch({ type: 'SYNC_STATE', state });
+            setMpState(prev => ({ ...prev, connectionStatus: 'connected' }));
+        });
+
+        // Game action from server (for non-host clients)
+        socket.on('game-action', ({ action }: { action: GameAction }) => {
+            dispatch(action);
+        });
+
+        // Player disconnected
+        socket.on('player-disconnected', ({ uuid: _uuid, name }: { uuid: string; name: string }) => {
+            console.log(`Player ${name} disconnected`);
+            // Could show a toast or indicator here
+        });
+
+        // Room closed
+        socket.on('room-closed', ({ message }: { message: string }) => {
+            alert(message || 'The host has closed the room.');
+            sessionStorage.removeItem('splendor_roomCode');
+            sessionStorage.removeItem('splendor_isHost');
+            window.location.reload();
+        });
+
+        // Error
+        socket.on('error', ({ message }: { message: string }) => {
+            console.error('Server error:', message);
+            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: message }));
+        });
 
         return () => {
-            if (peerRef.current) peerRef.current.destroy();
+            socket.disconnect();
         };
-    }, [setupPeer]);
+    }, [dispatch]);
 
-    // Persist Host State
+    // Connect on mount
     useEffect(() => {
-        if (mpState.isHost) {
-            sessionStorage.setItem('splendor_isHost', 'true');
-            if (mpState.gameId) sessionStorage.setItem('splendor_gameId', mpState.gameId);
-        } else if (mpState.gameId) {
-            sessionStorage.setItem('splendor_isHost', 'false');
-            sessionStorage.setItem('splendor_gameId', mpState.gameId);
-        }
-    }, [mpState.isHost, mpState.gameId]);
+        const cleanup = connect();
+        return cleanup;
+    }, [connect]);
 
-    // Sync state changes to peers (Host -> Clients)
+    // Sync state to server when it changes (Host only)
     useEffect(() => {
-        if (mpState.isHost && connectionsRef.current.length > 0) {
-            connectionsRef.current.forEach(conn => {
-                if (conn.open) {
-                    conn.send({ type: 'SYNC_STATE', state: gameState });
-                }
-            });
+        if (mpState.isHost && mpState.connectionStatus === 'connected' && socketRef.current?.connected) {
+            socketRef.current.emit('sync-state', { state: gameState });
         }
-    }, [gameState, mpState.isHost]);
+    }, [gameState, mpState.isHost, mpState.connectionStatus]);
 
     const hostGame = (playerName: string, playerUUID: string) => {
-        const peer = peerRef.current;
-        if (!peer || !peer.id) {
-            setMpState(prev => ({
-                ...prev,
-                connectionStatus: 'error',
-                errorMessage: 'Initialization not complete. Please wait a moment and try again.'
-            }));
+        if (!socketRef.current?.connected) {
+            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Not connected to server' }));
             return;
         }
-        const gameId = peer.id;
+
         sessionStorage.setItem('splendor_playerName', playerName);
-        setMpState(prev => ({
-            ...prev,
-            isHost: true,
-            connectionStatus: 'host_waiting',
-            gameId,
-            peerNames: { ...prev.peerNames, [gameId]: playerName },
-            peerUUIDs: { ...prev.peerUUIDs, [gameId]: playerUUID }
-        }));
+        sessionStorage.setItem('splendor_playerUUID', playerUUID);
+
+        socketRef.current.emit('create-room', { playerName, uuid: playerUUID });
     };
 
-    const joinGame = (hostId: string, playerName: string, playerUUID: string) => {
-        if (!peerRef.current) return;
+    const joinGame = (roomCode: string, playerName: string, playerUUID: string) => {
+        if (!socketRef.current?.connected) {
+            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Not connected to server' }));
+            return;
+        }
+
         sessionStorage.setItem('splendor_playerName', playerName);
-        setMpState(prev => ({ ...prev, isHost: false, connectionStatus: 'connecting' }));
+        sessionStorage.setItem('splendor_playerUUID', playerUUID);
+        sessionStorage.setItem('splendor_roomCode', roomCode.toUpperCase());
 
-        const conn = peerRef.current.connect(hostId);
-        clientConnRef.current = conn;
+        setMpState(prev => ({ ...prev, connectionStatus: 'connecting' }));
+        socketRef.current.emit('join-room', { roomCode: roomCode.toUpperCase(), playerName, uuid: playerUUID });
+    };
 
-        conn.on('open', () => {
-            setMpState(prev => ({ ...prev, connectionStatus: 'connected', gameId: hostId }));
-            // Send Hello
-            conn.send({ type: 'PLAYER_HELLO', name: playerName, id: peerRef.current?.id, uuid: playerUUID });
-        });
-
-        conn.on('data', (data: any) => {
-            if (data.type === 'SYNC_STATE') {
-                dispatch(data);
-            } else if (data.type === 'LOBBY_CLOSED') {
-                alert("The host has closed the lobby.");
-                sessionStorage.clear(); // Clear all
-                window.location.reload();
-            }
-        });
+    const startGame = (initialState: GameState) => {
+        if (!socketRef.current?.connected || !mpState.isHost) return;
+        socketRef.current.emit('start-game', { initialState });
     };
 
     const sendAction = (action: GameAction) => {
-        if (clientConnRef.current) {
-            clientConnRef.current.send(action);
-        }
+        if (!socketRef.current?.connected) return;
+        socketRef.current.emit('game-action', { action });
     };
 
     const closeLobby = () => {
-        if (mpState.isHost) {
-            // Notify all clients
-            connectionsRef.current.forEach(conn => {
-                if (conn.open) {
-                    conn.send({ type: 'LOBBY_CLOSED' });
-                    conn.close();
-                }
-            });
-            connectionsRef.current = [];
+        if (!socketRef.current?.connected || !mpState.isHost) return;
 
-            // Clear local state
-            sessionStorage.clear();
-            window.location.reload();
-        }
+        socketRef.current.emit('close-room');
+        sessionStorage.removeItem('splendor_roomCode');
+        sessionStorage.removeItem('splendor_isHost');
+        window.location.reload();
     };
 
     return {
@@ -302,6 +237,7 @@ export const useMultiplayer = (
         hostGame,
         joinGame,
         sendAction,
-        closeLobby
+        closeLobby,
+        startGame
     };
 };

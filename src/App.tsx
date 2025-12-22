@@ -4,7 +4,7 @@ import { useGameEngine } from './hooks/useGameEngine';
 import { GameBoard } from './components/GameBoard';
 
 function App() {
-  const { state, dispatch, mpState, hostGame, joinGame, closeLobby } = useGameEngine();
+  const { state, dispatch, mpState, hostGame, joinGame, closeLobby, startGame } = useGameEngine();
   const [remoteId, setRemoteId] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [isLocal, setIsLocal] = useState(false);
@@ -27,13 +27,24 @@ function App() {
 
   const handleStartGame = () => {
     if (!mpState.isHost) return;
-    // Gather players: Host + Connected Peers
+
+    // Build player list: Host (using current socket ID) + connected peers (using their UUIDs)
     const players = [
-      { id: mpState.peerId!, name: mpState.peerNames[mpState.peerId!] || 'Host', uuid: playerUUID },
-      ...mpState.connectedPeers.map((p, i) => ({ id: p, name: mpState.peerNames[p] || `Player ${i + 2}`, uuid: mpState.peerUUIDs?.[p] }))
+      { id: playerUUID, name: mpState.peerNames[playerUUID] || playerName || 'Host', uuid: playerUUID },
+      ...mpState.connectedPeers.map((uuid, i) => ({
+        id: uuid,
+        name: mpState.peerNames[uuid] || `Player ${i + 2}`,
+        uuid: uuid
+      }))
     ];
-    // Dispatch Start Game
+
+    // Create initial game state and send to server
     dispatch({ type: 'START_GAME', players });
+
+    // Wait a tick for state to update, then send to server
+    setTimeout(() => {
+      startGame(state);
+    }, 100);
   };
 
   return (
@@ -71,14 +82,15 @@ function App() {
                     <div style={{ display: 'flex', gap: '5px' }}>
                       <input
                         type="text"
-                        placeholder="Enter Host ID"
+                        placeholder="Enter Room Code"
                         value={remoteId}
-                        onChange={(e) => setRemoteId(e.target.value)}
-                        style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', flex: 1 }}
+                        onChange={(e) => setRemoteId(e.target.value.toUpperCase())}
+                        style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', flex: 1, textTransform: 'uppercase', letterSpacing: '2px', fontFamily: 'monospace' }}
+                        maxLength={6}
                       />
                       <button className="btn-primary" onClick={() => {
-                        if (remoteId.trim() && playerName.trim()) joinGame(remoteId, playerName, playerUUID);
-                        else alert("Please enter your name and Host ID");
+                        if (remoteId.trim() && playerName.trim()) joinGame(remoteId.toUpperCase(), playerName, playerUUID);
+                        else alert("Please enter your name and Room Code");
                       }}>Join</button>
                     </div>
                   </>
@@ -88,10 +100,10 @@ function App() {
                 {mpState.isHost && (mpState.connectionStatus === 'host_waiting' || mpState.connectionStatus === 'connected') && (
                   <div>
                     <p>Lobby Created!</p>
-                    <div style={{ background: '#222', padding: '10px', borderRadius: '5px', userSelect: 'all', cursor: 'pointer', border: '1px dashed #555', marginBottom: '10px' }}>
+                    <div style={{ background: '#222', padding: '15px 20px', borderRadius: '8px', userSelect: 'all', cursor: 'pointer', border: '2px dashed var(--marvel-blue)', marginBottom: '10px', fontSize: '1.5rem', fontFamily: 'monospace', letterSpacing: '3px' }}>
                       {mpState.gameId}
                     </div>
-                    <small>Share this ID to invite friends.</small>
+                    <small>Share this Room Code to invite friends.</small>
 
                     <h4 style={{ marginTop: '20px' }}>Connected Players ({mpState.connectedPeers.length + 1})</h4>
                     <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left' }}>
@@ -147,7 +159,20 @@ function App() {
               </p>
 
               {mpState.connectionStatus === 'connecting' && (
-                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.3)', borderTop: '4px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                <>
+                  <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.3)', borderTop: '4px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '20px' }}></div>
+                  <button
+                    className="btn-primary"
+                    style={{ background: '#555', fontSize: '0.9rem', padding: '8px 16px' }}
+                    onClick={() => {
+                      // Clear session and reload to return to lobby
+                      sessionStorage.clear();
+                      window.location.reload();
+                    }}
+                  >
+                    Cancel & Return to Lobby
+                  </button>
+                </>
               )}
 
               {mpState.connectionStatus === 'error' && (
