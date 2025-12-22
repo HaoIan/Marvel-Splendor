@@ -10,7 +10,7 @@ export type GameAction =
     | { type: 'SYNC_STATE'; state: GameState }
     | { type: 'PLAYER_JOINED'; player: Player }
     | { type: 'START_GAME'; players: { id: string; name: string; uuid?: string }[] }
-    | { type: 'RECONNECT_PLAYER'; oldId: string; newId: string; uuid?: string };
+    | { type: 'RECONNECT_PLAYER'; oldId: string; newId: string };
 
 // Shuffle helper
 const shuffle = (array: any[]) => {
@@ -316,21 +316,9 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
         }
 
         case 'RECONNECT_PLAYER': {
-            const { oldId, newId, uuid } = action;
-            let playerIndex = state.players.findIndex(p => p.id === oldId);
-
-            // Fallback to UUID matching if ID not found (Robustness for Host refresh)
-            if (playerIndex === -1 && uuid) {
-                playerIndex = state.players.findIndex(p => p.uuid === uuid);
-                if (playerIndex !== -1) {
-                    console.log(`RECONNECT_PLAYER: Found player by UUID ${uuid} instead of ID ${oldId}`);
-                }
-            }
-
-            if (playerIndex === -1) {
-                console.warn(`RECONNECT_PLAYER: Could not find player with oldId: ${oldId} or uuid: ${uuid}`);
-                return state;
-            }
+            const { oldId, newId } = action;
+            const playerIndex = state.players.findIndex(p => p.id === oldId);
+            if (playerIndex === -1) return state;
 
             const newPlayers = [...state.players];
             newPlayers[playerIndex] = { ...newPlayers[playerIndex], id: newId };
@@ -338,7 +326,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             return {
                 ...state,
                 players: newPlayers,
-                logs: [...state.logs, `${newPlayers[playerIndex].name} reconnected (ID Updated).`]
+                logs: [...state.logs, `${newPlayers[playerIndex].name} reconnected.`]
             };
         }
 

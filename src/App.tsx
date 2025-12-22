@@ -4,7 +4,7 @@ import { useGameEngine } from './hooks/useGameEngine';
 import { GameBoard } from './components/GameBoard';
 
 function App() {
-  const { state, dispatch, mpState, hostGame, joinGame, closeLobby, startGame } = useGameEngine();
+  const { state, dispatch, mpState, hostGame, joinGame, closeLobby } = useGameEngine();
   const [remoteId, setRemoteId] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [isLocal, setIsLocal] = useState(false);
@@ -27,24 +27,13 @@ function App() {
 
   const handleStartGame = () => {
     if (!mpState.isHost) return;
-
-    // Build player list: Host (using current socket ID) + connected peers (using their UUIDs)
+    // Gather players: Host + Connected Peers
     const players = [
-      { id: playerUUID, name: mpState.peerNames[playerUUID] || playerName || 'Host', uuid: playerUUID },
-      ...mpState.connectedPeers.map((uuid, i) => ({
-        id: uuid,
-        name: mpState.peerNames[uuid] || `Player ${i + 2}`,
-        uuid: uuid
-      }))
+      { id: mpState.peerId!, name: mpState.peerNames[mpState.peerId!] || 'Host', uuid: playerUUID },
+      ...mpState.connectedPeers.map((p, i) => ({ id: p, name: mpState.peerNames[p] || `Player ${i + 2}`, uuid: mpState.peerUUIDs?.[p] }))
     ];
-
-    // Create initial game state and send to server
+    // Dispatch Start Game
     dispatch({ type: 'START_GAME', players });
-
-    // Wait a tick for state to update, then send to server
-    setTimeout(() => {
-      startGame(state);
-    }, 100);
   };
 
   return (
@@ -55,7 +44,7 @@ function App() {
             <h1 style={{ fontFamily: 'Impact', letterSpacing: '2px', background: 'linear-gradient(to right, #f00, #fc0)', WebkitBackgroundClip: 'text', color: 'transparent', fontSize: '3rem', margin: '0' }}>
               MARVEL SPLENDOR
             </h1>
-            <p style={{ color: '#aaa', marginBottom: '2rem' }}>Cause Colonist Sucks!</p>
+            <p style={{ color: '#aaa', marginBottom: '2rem' }}>Assemble the Infinity Stones</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ borderBottom: '1px solid #444', paddingBottom: '1rem', marginBottom: '1rem' }}>
@@ -82,15 +71,14 @@ function App() {
                     <div style={{ display: 'flex', gap: '5px' }}>
                       <input
                         type="text"
-                        placeholder="Enter Room Code"
+                        placeholder="Enter Host ID"
                         value={remoteId}
-                        onChange={(e) => setRemoteId(e.target.value.toUpperCase())}
-                        style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', flex: 1, textTransform: 'uppercase', letterSpacing: '2px', fontFamily: 'monospace' }}
-                        maxLength={6}
+                        onChange={(e) => setRemoteId(e.target.value)}
+                        style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', flex: 1 }}
                       />
                       <button className="btn-primary" onClick={() => {
-                        if (remoteId.trim() && playerName.trim()) joinGame(remoteId.toUpperCase(), playerName, playerUUID);
-                        else alert("Please enter your name and Room Code");
+                        if (remoteId.trim() && playerName.trim()) joinGame(remoteId, playerName, playerUUID);
+                        else alert("Please enter your name and Host ID");
                       }}>Join</button>
                     </div>
                   </>
@@ -100,10 +88,10 @@ function App() {
                 {mpState.isHost && (mpState.connectionStatus === 'host_waiting' || mpState.connectionStatus === 'connected') && (
                   <div>
                     <p>Lobby Created!</p>
-                    <div style={{ background: '#222', padding: '15px 20px', borderRadius: '8px', userSelect: 'all', cursor: 'pointer', border: '2px dashed var(--marvel-blue)', marginBottom: '10px', fontSize: '1.5rem', fontFamily: 'monospace', letterSpacing: '3px' }}>
+                    <div style={{ background: '#222', padding: '10px', borderRadius: '5px', userSelect: 'all', cursor: 'pointer', border: '1px dashed #555', marginBottom: '10px' }}>
                       {mpState.gameId}
                     </div>
-                    <small>Share this Room Code to invite friends.</small>
+                    <small>Share this ID to invite friends.</small>
 
                     <h4 style={{ marginTop: '20px' }}>Connected Players ({mpState.connectedPeers.length + 1})</h4>
                     <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left' }}>
@@ -144,57 +132,14 @@ function App() {
           </div>
         </div>
       ) : (
-        <>
-          {/* Reconnection Overlay for Active Game */}
-          {(!isLocal && !mpState.isHost && mpState.connectionStatus !== 'connected') && (
-            <div style={{
-              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-              background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
-              zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexDirection: 'column', color: 'white'
-            }}>
-              <h2 style={{ color: 'var(--marvel-red)', textShadow: '0 0 10px red' }}>CONNECTION LOST</h2>
-              <p style={{ marginBottom: '20px' }}>
-                {mpState.connectionStatus === 'connecting' ? 'Attempting to reconnect...' : 'Disconnected from Host'}
-              </p>
-
-              {mpState.connectionStatus === 'connecting' && (
-                <>
-                  <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.3)', borderTop: '4px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '20px' }}></div>
-                  <button
-                    className="btn-primary"
-                    style={{ background: '#555', fontSize: '0.9rem', padding: '8px 16px' }}
-                    onClick={() => {
-                      // Clear session and reload to return to lobby
-                      sessionStorage.clear();
-                      window.location.reload();
-                    }}
-                  >
-                    Cancel & Return to Lobby
-                  </button>
-                </>
-              )}
-
-              {mpState.connectionStatus === 'error' && (
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: '#ff8888', maxWidth: '400px' }}>{mpState.errorMessage}</p>
-                  <button className="btn-primary" onClick={() => window.location.reload()}>Reload Game</button>
-                </div>
-              )}
-
-              <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-            </div>
-          )}
-
-          <GameBoard
-            state={state}
-            dispatch={dispatch}
-            myPeerId={myPlayerId || (isLocal ? state.players[state.currentPlayerIndex].id : null)}
-            myUUID={playerUUID}
-            closeLobby={closeLobby}
-            isHost={mpState.isHost}
-          />
-        </>
+        <GameBoard
+          state={state}
+          dispatch={dispatch}
+          myPeerId={myPlayerId || (isLocal ? state.players[state.currentPlayerIndex].id : null)}
+          myUUID={playerUUID}
+          closeLobby={closeLobby}
+          isHost={mpState.isHost}
+        />
       )}
     </div>
   );

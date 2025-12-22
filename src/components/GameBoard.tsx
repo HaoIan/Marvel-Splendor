@@ -67,7 +67,7 @@ const Token = ({ color, count, onClick, size = 100, style }: { color: keyof Toke
     </div>
 );
 
-const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: { card: CardType, onClick: () => void, disabled?: boolean, canAfford?: boolean, noAnimate?: boolean, hideName?: boolean }) => {
+const CardView = ({ card, onClick, disabled, canAfford, noAnimate }: { card: CardType, onClick: () => void, disabled?: boolean, canAfford?: boolean, noAnimate?: boolean }) => {
     const bgImage = card.imageUrl || `/assets/hero-tier-${card.tier}.png`;
     const [animate, setAnimate] = useState(!noAnimate);
     const [animDelay, setAnimDelay] = useState('0s');
@@ -116,7 +116,7 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: {
                     amt > 0 ? <div key={color} className={`cost-bubble ${color}`}>{amt}</div> : null
                 ))}
             </div>
-            {card.name && !hideName && (
+            {card.name && (
                 <div style={{
                     position: 'absolute', bottom: '2px', right: '2px',
                     fontSize: '0.6rem', background: 'rgba(0,0,0,0.7)', padding: '1px 3px', borderRadius: '3px',
@@ -199,11 +199,7 @@ interface GameBoardProps {
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId, myUUID, closeLobby, isHost }) => {
-    // Determine isMyTurn: Match ID OR Match UUID (Persistent Session) OR (Hotseat & Player 0)
-    const currentPlayer = state.players[state.currentPlayerIndex];
-    const isMyTurn = (currentPlayer.id === myPeerId) ||
-        (myUUID && currentPlayer.uuid === myUUID) ||
-        (myPeerId === null && state.currentPlayerIndex === 0);
+    const isMyTurn = state.players[state.currentPlayerIndex].id === myPeerId || (myPeerId === null && state.currentPlayerIndex === 0);
 
     // Determine the viewing player (Me in multiplayer, or Current Player in hotseat)
     // Priority: 1. Match by ID (PeerID), 2. Match by UUID (Persistent Session), 3. Active Player
@@ -735,10 +731,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                     background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
                 }} onClick={() => setSelectedCard(null)}>
                     <div className="glass-panel" style={{ textAlign: 'center', border: '1px solid var(--marvel-blue)', boxShadow: '0 0 30px var(--marvel-blue)' }} onClick={e => e.stopPropagation()}>
-                        <h3>{selectedCard.name || 'Selected Card'}</h3>
+                        <h3>Selected Card</h3>
                         <div style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
                             <div id="modal-card-view" style={{ transform: 'scale(1.5)', margin: '30px' }}>
-                                <CardView card={selectedCard} onClick={() => { }} disabled noAnimate hideName />
+                                <CardView card={selectedCard} onClick={() => { }} disabled noAnimate />
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>

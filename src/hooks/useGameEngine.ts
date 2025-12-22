@@ -24,7 +24,7 @@ export const useGameEngine = () => {
     }, [state]);
 
     // Custom dispatch wrapper to handle forwarding actions to Host if we are Client
-    const { mpState, hostGame, joinGame, sendAction, closeLobby, startGame } = useMultiplayer(dispatch, state);
+    const { mpState, hostGame, joinGame, sendAction, closeLobby } = useMultiplayer(dispatch, state);
 
     const matchDispatch = (action: GameAction) => {
         // If we are Local (no MP) or Host, we dispatch locally.
@@ -32,7 +32,7 @@ export const useGameEngine = () => {
         // If we are Client, we send action to Host (unless it's 'SYNC_STATE' which comes from Host).
 
         if (mpState.connectionStatus === 'connected' && !mpState.isHost) {
-            // Client logic: Send to server
+            // Client logic: Send to host
             // Exception: Local only actions or optimistic updates? 
             // For now, strict Host-authoritative.
             sendAction(action);
@@ -48,7 +48,6 @@ export const useGameEngine = () => {
         mpState,
         hostGame,
         joinGame,
-        closeLobby,
-        startGame
+        closeLobby
     };
 };
