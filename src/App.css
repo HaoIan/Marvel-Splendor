@@ -150,7 +150,7 @@ body {
   grid-template-areas:
     "board player-right";
   height: 100%;
-  gap: 0;
+  gap: 1rem;
   padding: 5rem 1rem 1rem 1rem;
   box-sizing: border-box;
   overflow: hidden;

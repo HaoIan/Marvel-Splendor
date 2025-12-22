@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Peer from 'peerjs';
 import type { DataConnection } from 'peerjs';
 import type { GameAction } from './gameReducer';
@@ -39,27 +39,30 @@ export const useMultiplayer = (
         gameStateRef.current = gameState;
     }, [gameState]);
 
-    // Initialize Peer
-    useEffect(() => {
-        const savedPeerId = sessionStorage.getItem('splendor_peerId');
-        const savedIsHost = sessionStorage.getItem('splendor_isHost') === 'true';
-        const savedGameId = sessionStorage.getItem('splendor_gameId');
-        const savedName = sessionStorage.getItem('splendor_playerName');
-        const savedUUID = sessionStorage.getItem('splendor_playerUUID');
+    // Define connection logic as a stable function we can call from anywhere
+    const setupPeer = useCallback((requestedId?: string) => {
+        // Cleanup existing (if any) - though usually we call this on mount or after destroy
+        if (peerRef.current) {
+            peerRef.current.destroy();
+            peerRef.current = null;
+        }
 
-        // If we were host, try to reclaim the ID. If client, just get a new ID but connect to savedGameId.
-        const peerOptions = (savedIsHost && savedPeerId) ? { debug: 2 } : undefined;
-
-        const peer = savedPeerId ? new Peer(savedPeerId, peerOptions) : new Peer();
-
+        const peer = requestedId ? new Peer(requestedId, { debug: 2 }) : new Peer({ debug: 2 });
         peerRef.current = peer;
 
         peer.on('open', (id) => {
             console.log('Peer Opened:', id);
-            setMpState(prev => ({ ...prev, peerId: id }));
+            setMpState(prev => ({ ...prev, peerId: id, connectionStatus: 'idle', errorMessage: undefined }));
             sessionStorage.setItem('splendor_peerId', id);
 
+            // Access latest storage for recovery context
+            const savedIsHost = sessionStorage.getItem('splendor_isHost') === 'true';
+            const savedGameId = sessionStorage.getItem('splendor_gameId');
+            const savedName = sessionStorage.getItem('splendor_playerName');
+            const savedUUID = sessionStorage.getItem('splendor_playerUUID');
+
             // Auto-reconnect logic
+            // 1. If we were Host, and we successfully reclaimed our ID:
             if (savedIsHost && savedGameId === id) {
                 console.log('Restoring Host Session');
                 setMpState(prev => ({
@@ -70,9 +73,14 @@ export const useMultiplayer = (
                     peerNames: { ...prev.peerNames, [id]: savedName || 'Host' },
                     peerUUIDs: { ...prev.peerUUIDs, [id]: savedUUID || '' }
                 }));
-            } else if (!savedIsHost && savedGameId) {
+            }
+            // 2. If we were Client (or Host who lost ID), and we have a target GameID:
+            else if (!savedIsHost && savedGameId) {
                 console.log('Restoring Client Session, reconnecting to:', savedGameId);
-                joinGame(savedGameId, savedName || 'Player', savedUUID || '');
+                // We use a small timeout to let the UI settle or ensure peer is ready
+                setTimeout(() => {
+                    joinGame(savedGameId, savedName || 'Player', savedUUID || '');
+                }, 500);
             }
         });
 
@@ -127,22 +135,57 @@ export const useMultiplayer = (
 
         peer.on('error', (err) => {
             console.error('Peer Error:', err);
-            // If ID is taken (unavailable-id), we might need to fallback
+
+            // AUTOMATIC RETRY ON UNAVAILABLE ID (Server thinks we are still online with old ID)
             if (err.type === 'unavailable-id') {
-                sessionStorage.removeItem('splendor_peerId'); // Clear invalid ID
-                // Maybe retry with new ID? For now just show error.
+                console.warn('Peer ID taken/unavailable. Clearing stored ID and retrying with fresh ID...');
+                sessionStorage.removeItem('splendor_peerId');
+                setupPeer(undefined);
+                return;
             }
+
+            // AUTOMATIC RETRY ON CONNECTION FAILURE (Host not found / Flaky signaling)
+            // If we are trying to join a game (we have a valid gameId we want to be connected to)
+            const targetGameId = sessionStorage.getItem('splendor_gameId'); // Or look at mpState, but mpState might not be updated inside closure if we didn't use Ref?
+            // Actually setupPeer recreates the closure, so it's fine? No, setupPeer is useCallback with [] dep (well, dispatch).
+            // But we can check sessionStorage for intent.
+            const isHost = sessionStorage.getItem('splendor_isHost') === 'true';
+
+            if (!isHost && targetGameId && (err.type === 'peer-unavailable' || err.message.includes('Could not connect'))) {
+                console.warn(`Connection to host ${targetGameId} failed. Retrying in 2s...`);
+
+                // Update state to show we are trying
+                setMpState(prev => ({
+                    ...prev,
+                    connectionStatus: 'connecting',
+                    errorMessage: `Connection failed. Retrying...`
+                }));
+
+                setTimeout(() => {
+                    // Retry joining
+                    joinGame(targetGameId, sessionStorage.getItem('splendor_playerName') || 'Player', sessionStorage.getItem('splendor_playerUUID') || '');
+                }, 2000);
+                return;
+            }
+
             setMpState(prev => ({
                 ...prev,
                 connectionStatus: 'error',
                 errorMessage: `Peer Error: ${err.type} - ${err.message}`
             }));
         });
+    }, [dispatch]); // Dependencies for setupPeer. Dispatch is stable.
+
+    // Initial Mount Setup
+    useEffect(() => {
+        const savedPeerId = sessionStorage.getItem('splendor_peerId');
+        // Initial setup attempts to reclaim ID if present
+        setupPeer(savedPeerId || undefined);
 
         return () => {
-            peer.destroy();
+            if (peerRef.current) peerRef.current.destroy();
         };
-    }, []);
+    }, [setupPeer]);
 
     // Persist Host State
     useEffect(() => {
@@ -207,13 +250,7 @@ export const useMultiplayer = (
                 dispatch(data);
             } else if (data.type === 'LOBBY_CLOSED') {
                 alert("The host has closed the lobby.");
-                sessionStorage.removeItem('splendor_gameState');
-                sessionStorage.removeItem('splendor_host');
-                sessionStorage.removeItem('splendor_gameId');
-                sessionStorage.removeItem('splendor_playerName');
-                sessionStorage.removeItem('splendor_peerId');
-                sessionStorage.removeItem('splendor_isHost');
-                sessionStorage.removeItem('splendor_playerUUID');
+                sessionStorage.clear(); // Clear all
                 window.location.reload();
             }
         });
@@ -237,14 +274,7 @@ export const useMultiplayer = (
             connectionsRef.current = [];
 
             // Clear local state
-            sessionStorage.removeItem('splendor_gameState');
-            sessionStorage.removeItem('splendor_host');
-            sessionStorage.removeItem('splendor_gameId');
-            sessionStorage.removeItem('splendor_playerName');
-            sessionStorage.removeItem('splendor_peerId');
-            sessionStorage.removeItem('splendor_isHost');
-            sessionStorage.removeItem('splendor_playerUUID');
-
+            sessionStorage.clear();
             window.location.reload();
         }
     };

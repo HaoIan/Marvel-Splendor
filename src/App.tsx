@@ -132,14 +132,44 @@ function App() {
           </div>
         </div>
       ) : (
-        <GameBoard
-          state={state}
-          dispatch={dispatch}
-          myPeerId={myPlayerId || (isLocal ? state.players[state.currentPlayerIndex].id : null)}
-          myUUID={playerUUID}
-          closeLobby={closeLobby}
-          isHost={mpState.isHost}
-        />
+        <>
+          {/* Reconnection Overlay for Active Game */}
+          {(!isLocal && !mpState.isHost && mpState.connectionStatus !== 'connected') && (
+            <div style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+              zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexDirection: 'column', color: 'white'
+            }}>
+              <h2 style={{ color: 'var(--marvel-red)', textShadow: '0 0 10px red' }}>CONNECTION LOST</h2>
+              <p style={{ marginBottom: '20px' }}>
+                {mpState.connectionStatus === 'connecting' ? 'Attempting to reconnect...' : 'Disconnected from Host'}
+              </p>
+
+              {mpState.connectionStatus === 'connecting' && (
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(255,255,255,0.3)', borderTop: '4px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+              )}
+
+              {mpState.connectionStatus === 'error' && (
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ color: '#ff8888', maxWidth: '400px' }}>{mpState.errorMessage}</p>
+                  <button className="btn-primary" onClick={() => window.location.reload()}>Reload Game</button>
+                </div>
+              )}
+
+              <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
+
+          <GameBoard
+            state={state}
+            dispatch={dispatch}
+            myPeerId={myPlayerId || (isLocal ? state.players[state.currentPlayerIndex].id : null)}
+            myUUID={playerUUID}
+            closeLobby={closeLobby}
+            isHost={mpState.isHost}
+          />
+        </>
       )}
     </div>
   );
