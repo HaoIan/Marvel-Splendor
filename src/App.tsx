@@ -44,7 +44,7 @@ function App() {
             <h1 style={{ fontFamily: 'Impact', letterSpacing: '2px', background: 'linear-gradient(to right, #f00, #fc0)', WebkitBackgroundClip: 'text', color: 'transparent', fontSize: '3rem', margin: '0' }}>
               MARVEL SPLENDOR
             </h1>
-            <p style={{ color: '#aaa', marginBottom: '2rem' }}>Assemble the Infinity Stones</p>
+            <p style={{ color: '#aaa', marginBottom: '2rem' }}>Cause Colonist Sucks!</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ borderBottom: '1px solid #444', paddingBottom: '1rem', marginBottom: '1rem' }}>

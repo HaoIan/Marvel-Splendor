@@ -168,11 +168,29 @@ export const useMultiplayer = (
                 return;
             }
 
+            // SIGNALING SERVER DISCONNECTION (Host lost connection to broker)
+            if (err.type === 'network' || err.type === 'disconnected' || err.message.includes('Lost connection to server')) {
+                console.warn('Lost connection to Signaling Server. Attempting to reconnect...');
+                if (peer && !peer.destroyed) {
+                    peer.reconnect();
+                    return;
+                }
+            }
+
             setMpState(prev => ({
                 ...prev,
                 connectionStatus: 'error',
                 errorMessage: `Peer Error: ${err.type} - ${err.message}`
             }));
+        });
+
+        // Handle Disconnected Event (Signaling server lost, but P2P connections might be alive)
+        peer.on('disconnected', () => {
+            console.log('Peer disconnected from signaling server. Attempting reconnect...');
+            // We don't necessarily want to show an error yet if we can reconnect seamlessly
+            if (peer && !peer.destroyed) {
+                peer.reconnect();
+            }
         });
     }, [dispatch]); // Dependencies for setupPeer. Dispatch is stable.
 

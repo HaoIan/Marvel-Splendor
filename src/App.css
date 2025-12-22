@@ -13,8 +13,21 @@
   --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
 body {
+  height: 100%;
   margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-dark);
   background-image: url('./assets/background.png');
@@ -27,8 +40,8 @@ body {
 }
 
 #root {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -171,6 +184,7 @@ body {
   flex-direction: column;
   gap: 10px;
   /* Don't stretch vertically if few players */
+  overscroll-behavior: contain;
 }
 
 .board-center {
@@ -179,6 +193,9 @@ body {
   flex-direction: column;
   overflow-y: auto;
   min-height: 0;
+  height: 100%;
+  padding: 10px 0 10px 10px;
+  overscroll-behavior: contain;
 }
 
 .game-log-container {
@@ -218,14 +235,7 @@ body {
   /* Add padding to prevent hover clipping at edges */
 }
 
-.board-center {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow-y: auto;
-  /* Move scrolling to the container */
-  padding: 10px 0 10px 10px;
-}
+
 
 .card-row {
   display: flex;
