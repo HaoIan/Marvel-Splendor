@@ -348,11 +348,18 @@ const processEndTurn = (state: GameState): GameState => {
     const player = state.players[state.currentPlayerIndex];
     let nextState = { ...state };
 
-    // Check Win Condition Trigger: 16 Points + Green Stone
+    // Check Win Condition Trigger: 16 Points + Green Stone + 1 Card of Each Color
     // If condition met, and not already in final round, trigger final round.
     if (!state.finalRound && player.points >= 16 && player.tokens.green > 0) {
-        nextState.finalRound = true;
-        nextState.logs = [...nextState.logs, `${player.name} has triggered the end game! Finishing the round...`];
+        // Check for all 5 colors logic
+        const playerColors = new Set(player.tableau.map(c => c.bonus));
+        const requiredColors = ['red', 'blue', 'yellow', 'purple', 'orange'];
+        const hasAllColors = requiredColors.every(color => playerColors.has(color as any));
+
+        if (hasAllColors) {
+            nextState.finalRound = true;
+            nextState.logs = [...nextState.logs, `${player.name} has triggered the end game! Finishing the round...`];
+        }
     }
 
     const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
