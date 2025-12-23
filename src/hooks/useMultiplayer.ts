@@ -1,17 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
-import Peer from 'peerjs';
-import type { DataConnection } from 'peerjs';
+import { supabase } from '../lib/supabase';
 import type { GameAction } from './gameReducer';
+import { gameReducer } from './gameReducer';
 import type { GameState } from '../types';
 
 export interface MultiplayerState {
-    peerId: string | null;
-    connectionStatus: 'idle' | 'host_waiting' | 'connecting' | 'connected' | 'error';
-    isHost: boolean;
+    playerId: string | null; // My ID (used for turn checks)
     gameId: string | null;
-    connectedPeers: string[];
-    peerNames: Record<string, string>; // Map peerId -> name
-    peerUUIDs: Record<string, string>; // Map peerId -> uuid
+    connectionStatus: 'idle' | 'connecting' | 'connected' | 'error';
+    isHost: boolean; // "Host" just means "Creator" now
     errorMessage?: string;
 }
 
@@ -20,233 +17,191 @@ export const useMultiplayer = (
     gameState: GameState
 ) => {
     const [mpState, setMpState] = useState<MultiplayerState>({
-        peerId: null,
-        connectionStatus: 'idle',
-        isHost: false,
+        playerId: null,
         gameId: null,
-        connectedPeers: [],
-        peerNames: {},
-        peerUUIDs: {}
+        connectionStatus: 'idle',
+        isHost: false
     });
 
-    const peerRef = useRef<Peer | null>(null);
-    const connectionsRef = useRef<DataConnection[]>([]); // Host: list of clients
-    const clientConnRef = useRef<DataConnection | null>(null); // Client: connection to host
-
-    // IMPORTANT: Track latest gameState in ref so event listeners (which are closures) can access it
     const gameStateRef = useRef(gameState);
     useEffect(() => {
         gameStateRef.current = gameState;
     }, [gameState]);
 
-    // Initialize Peer
+    // Cleanup subscription on unmount
     useEffect(() => {
-        const savedPeerId = sessionStorage.getItem('splendor_peerId');
-        const savedIsHost = sessionStorage.getItem('splendor_isHost') === 'true';
-        const savedGameId = sessionStorage.getItem('splendor_gameId');
-        const savedName = sessionStorage.getItem('splendor_playerName');
-        const savedUUID = sessionStorage.getItem('splendor_playerUUID');
-
-        // If we were host, try to reclaim the ID. If client, just get a new ID but connect to savedGameId.
-        const peerOptions = (savedIsHost && savedPeerId) ? { debug: 2 } : undefined;
-
-        const peer = savedPeerId ? new Peer(savedPeerId, peerOptions) : new Peer();
-
-        peerRef.current = peer;
-
-        peer.on('open', (id) => {
-            console.log('Peer Opened:', id);
-            setMpState(prev => ({ ...prev, peerId: id }));
-            sessionStorage.setItem('splendor_peerId', id);
-
-            // Auto-reconnect logic
-            if (savedIsHost && savedGameId === id) {
-                console.log('Restoring Host Session');
-                setMpState(prev => ({
-                    ...prev,
-                    isHost: true,
-                    connectionStatus: 'host_waiting',
-                    gameId: id,
-                    peerNames: { ...prev.peerNames, [id]: savedName || 'Host' },
-                    peerUUIDs: { ...prev.peerUUIDs, [id]: savedUUID || '' }
-                }));
-            } else if (!savedIsHost && savedGameId) {
-                console.log('Restoring Client Session, reconnecting to:', savedGameId);
-                joinGame(savedGameId, savedName || 'Player', savedUUID || '');
-            }
-        });
-
-        peer.on('connection', (conn) => {
-            // Handle incoming connection (Host side)
-            console.log('Incoming connection:', conn.peer);
-            connectionsRef.current.push(conn);
-
-            conn.on('open', () => {
-                console.log('Connection opened with:', conn.peer);
-                setMpState(prev => ({
-                    ...prev,
-                    connectedPeers: [...prev.connectedPeers, conn.peer],
-                    connectionStatus: 'connected'
-                }));
-                // Send current state to new player - USE REF to get latest state!
-                conn.send({ type: 'SYNC_STATE', state: gameStateRef.current });
-            });
-
-            conn.on('data', (data: any) => {
-                if (data.type === 'PLAYER_HELLO') {
-                    const { name, id, uuid } = data;
-
-                    // Check for reconnection - USE REF
-                    const currentGameState = gameStateRef.current;
-                    const existingPlayer = currentGameState.players.find(p => p.uuid === uuid);
-
-                    if (existingPlayer && existingPlayer.id !== id) {
-                        console.log(`Player ${name} reconnected with new ID ${id} (old: ${existingPlayer.id})`);
-                        // Dispatch action to update player ID in game state
-                        dispatch({ type: 'RECONNECT_PLAYER', oldId: existingPlayer.id, newId: id });
-                    }
-
-                    setMpState(prev => ({
-                        ...prev,
-                        peerNames: { ...prev.peerNames, [id]: name },
-                        peerUUIDs: { ...prev.peerUUIDs, [id]: uuid }
-                    }));
-                } else if (data.type) {
-                    dispatch(data);
-                }
-            });
-
-            conn.on('close', () => {
-                connectionsRef.current = connectionsRef.current.filter(c => c !== conn);
-                setMpState(prev => ({
-                    ...prev,
-                    connectedPeers: prev.connectedPeers.filter(p => p !== conn.peer)
-                }));
-            });
-        });
-
-        peer.on('error', (err) => {
-            console.error('Peer Error:', err);
-            // If ID is taken (unavailable-id), we might need to fallback
-            if (err.type === 'unavailable-id') {
-                sessionStorage.removeItem('splendor_peerId'); // Clear invalid ID
-                // Maybe retry with new ID? For now just show error.
-            }
-            setMpState(prev => ({
-                ...prev,
-                connectionStatus: 'error',
-                errorMessage: `Peer Error: ${err.type} - ${err.message}`
-            }));
-        });
-
         return () => {
-            peer.destroy();
+            if (mpState.gameId) {
+                supabase.channel(`game:${mpState.gameId}`).unsubscribe();
+            }
         };
+    }, [mpState.gameId]);
+
+    // Auto-reconnect on mount
+    useEffect(() => {
+        const savedGameId = sessionStorage.getItem('splendor_gameId');
+        const savedPlayerName = sessionStorage.getItem('splendor_playerName');
+        const savedPlayerUUID = sessionStorage.getItem('splendor_playerUUID');
+        const savedIsCreator = sessionStorage.getItem('splendor_isHost') === 'true';
+
+        if (savedGameId && savedPlayerName && savedPlayerUUID) {
+            console.log("Restoring session:", savedGameId);
+            joinGame(savedGameId, savedPlayerName, savedPlayerUUID, savedIsCreator);
+        }
     }, []);
 
-    // Persist Host State
-    useEffect(() => {
-        if (mpState.isHost) {
-            sessionStorage.setItem('splendor_isHost', 'true');
-            if (mpState.gameId) sessionStorage.setItem('splendor_gameId', mpState.gameId);
-        } else if (mpState.gameId) {
-            sessionStorage.setItem('splendor_isHost', 'false');
-            sessionStorage.setItem('splendor_gameId', mpState.gameId);
-        }
-    }, [mpState.isHost, mpState.gameId]);
+    const hostGame = async (playerName: string, playerUUID: string) => {
+        setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: undefined }));
 
-    // Sync state changes to peers (Host -> Clients)
-    useEffect(() => {
-        if (mpState.isHost && connectionsRef.current.length > 0) {
-            connectionsRef.current.forEach(conn => {
-                if (conn.open) {
-                    conn.send({ type: 'SYNC_STATE', state: gameState });
-                }
-            });
-        }
-    }, [gameState, mpState.isHost]);
+        // 1. Create Initial State
+        // We use the current LOCAL state as the template, but we need to ensure players are set up correctly.
+        // Actually, the lobby logic is different now. We probably want to start with a blank slate or pre-filled state.
+        // For simplicity, let's assume the App passes us a valid initial state or we trigger START_GAME later.
+        // But wait, "Lobby" in Supabase mean we need a way to gather players BEFORE creating the 'matches' row?
+        // OR, we create the row, and players 'join' by updating the 'players' array in the JSON?
 
-    const hostGame = (playerName: string, playerUUID: string) => {
-        const peer = peerRef.current;
-        if (!peer || !peer.id) {
-            setMpState(prev => ({
-                ...prev,
-                connectionStatus: 'error',
-                errorMessage: 'Initialization not complete. Please wait a moment and try again.'
-            }));
+        // Let's go with: Create row with "Lobby" status.
+        const defaultState = gameStateRef.current;
+        // Ensure Host is player 1
+        const initialState = {
+            ...defaultState,
+            players: [{ id: playerUUID /* Use UUID as ID */, name: playerName, tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 }, hand: [], tableau: [], points: 0, noble: null }],
+            status: 'LOBBY'
+        };
+
+        const { data, error } = await supabase
+            .from('matches')
+            .insert([{ game_state: initialState }])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating game:', error);
+            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: error.message }));
             return;
         }
-        const gameId = peer.id;
-        sessionStorage.setItem('splendor_playerName', playerName);
-        setMpState(prev => ({
-            ...prev,
-            isHost: true,
-            connectionStatus: 'host_waiting',
-            gameId,
-            peerNames: { ...prev.peerNames, [gameId]: playerName },
-            peerUUIDs: { ...prev.peerUUIDs, [gameId]: playerUUID }
-        }));
+
+        // 2. Join it
+        joinGame(data.id, playerName, playerUUID, true);
     };
 
-    const joinGame = (hostId: string, playerName: string, playerUUID: string) => {
-        if (!peerRef.current) return;
-        sessionStorage.setItem('splendor_playerName', playerName);
-        setMpState(prev => ({ ...prev, isHost: false, connectionStatus: 'connecting' }));
+    const joinGame = async (gameId: string, playerName: string, playerUUID: string, isCreator = false) => {
+        setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: undefined }));
 
-        const conn = peerRef.current.connect(hostId);
-        clientConnRef.current = conn;
+        // 1. Fetch current state to see if valid and add ourselves if needed
+        const { data, error } = await supabase
+            .from('matches')
+            .select('game_state')
+            .eq('id', gameId)
+            .single();
 
-        conn.on('open', () => {
-            setMpState(prev => ({ ...prev, connectionStatus: 'connected', gameId: hostId }));
-            // Send Hello
-            conn.send({ type: 'PLAYER_HELLO', name: playerName, id: peerRef.current?.id, uuid: playerUUID });
-        });
-
-        conn.on('data', (data: any) => {
-            if (data.type === 'SYNC_STATE') {
-                dispatch(data);
-            } else if (data.type === 'LOBBY_CLOSED') {
-                alert("The host has closed the lobby.");
-                sessionStorage.removeItem('splendor_gameState');
-                sessionStorage.removeItem('splendor_host');
-                sessionStorage.removeItem('splendor_gameId');
-                sessionStorage.removeItem('splendor_playerName');
-                sessionStorage.removeItem('splendor_peerId');
-                sessionStorage.removeItem('splendor_isHost');
-                sessionStorage.removeItem('splendor_playerUUID');
-                window.location.reload();
-            }
-        });
-    };
-
-    const sendAction = (action: GameAction) => {
-        if (clientConnRef.current) {
-            clientConnRef.current.send(action);
+        if (error || !data) {
+            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game not found' }));
+            return;
         }
-    };
 
-    const closeLobby = () => {
-        if (mpState.isHost) {
-            // Notify all clients
-            connectionsRef.current.forEach(conn => {
-                if (conn.open) {
-                    conn.send({ type: 'LOBBY_CLOSED' });
-                    conn.close();
+        let syncedState = data.game_state as GameState;
+
+        // If in LOBBY, add ourselves if not present
+        if (syncedState.status === 'LOBBY' || syncedState.status === 'PLAYING') {
+            const existingPlayerIndex = syncedState.players.findIndex(p => p.id === playerUUID);
+            if (existingPlayerIndex === -1) {
+                // Add player
+                if (syncedState.players.length >= 4) {
+                    setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game full' }));
+                    return;
                 }
-            });
-            connectionsRef.current = [];
+                syncedState.players.push({
+                    id: playerUUID,
+                    name: playerName,
+                    tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 } as any, // Type hack if needed, or use proper initializers
+                    hand: [],
+                    tableau: [],
+                    points: 0
+                } as any);
 
-            // Clear local state
-            sessionStorage.removeItem('splendor_gameState');
-            sessionStorage.removeItem('splendor_host');
-            sessionStorage.removeItem('splendor_gameId');
-            sessionStorage.removeItem('splendor_playerName');
-            sessionStorage.removeItem('splendor_peerId');
-            sessionStorage.removeItem('splendor_isHost');
-            sessionStorage.removeItem('splendor_playerUUID');
-
-            window.location.reload();
+                // Update DB
+                await supabase
+                    .from('matches')
+                    .update({ game_state: syncedState })
+                    .eq('id', gameId);
+            } else {
+                // Update name?
+                // syncedState.players[existingPlayerIndex].name = playerName;
+            }
         }
+
+        // 2. Subscribe to changes
+        const channel = supabase
+            .channel(`game:${gameId}`)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches', filter: `id=eq.${gameId}` }, (payload) => {
+                const newState = payload.new.game_state as GameState;
+                dispatch({ type: 'SYNC_STATE', state: newState });
+            })
+            .subscribe();
+
+        // 3. Sync local
+        dispatch({ type: 'SYNC_STATE', state: syncedState });
+
+        // Save session
+        sessionStorage.setItem('splendor_gameId', gameId);
+        sessionStorage.setItem('splendor_playerName', playerName);
+        if (isCreator) sessionStorage.setItem('splendor_isHost', 'true');
+        else sessionStorage.removeItem('splendor_isHost');
+
+        setMpState({
+            playerId: playerUUID,
+            gameId,
+            connectionStatus: 'connected',
+            isHost: isCreator
+        });
+    };
+
+    const sendAction = async (action: GameAction) => {
+        if (!mpState.gameId) return;
+
+        // 1. Run Optimistic Local Update
+        // We use the gameReducer logic to verify validity and calculate next state
+        // IMPORTANT: We need `gameReducer` to be pure.
+        const prevState = gameStateRef.current;
+
+        // Validation: Is it my turn? (Only for game moves, not startup)
+        // Note: gameReducer generally handles logic, but simple turn check is good UX
+        // However, we'll let existing UI handle visuals.
+
+        try {
+            const nextState = gameReducer(prevState, action);
+
+            // 2. Push to Supabase
+            // We push the WHOLE state.
+            // Race condition risk: High if high frequency.
+            // Mitigation: Splendor is turn based. Low risk.
+
+            const { error } = await supabase
+                .from('matches')
+                .update({ game_state: nextState })
+                .eq('id', mpState.gameId);
+
+            if (error) {
+                console.error("Failed to sync move:", error);
+                // Ideally revert local state if we optimistically updated? 
+                // But we actully relay on the subscription to confirm.
+                // If we want immediate feedback, we dispatch locally too:
+                // dispatch(action); 
+                // BUT dispatching locally might cause jump if remote state differs.
+                // Safest: Dispatch locally (Optimistic), Subscription will overwrite if needed.
+                dispatch(action);
+            }
+        } catch (e) {
+            console.error("Invalid move or reducer error", e);
+        }
+    };
+
+    const closeLobby = async () => {
+        // Just leave? delete?
+        // For now, just reload.
+        setMpState({ playerId: null, gameId: null, connectionStatus: 'idle', isHost: false });
+        window.location.reload();
     };
 
     return {

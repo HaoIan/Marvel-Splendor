@@ -27,17 +27,12 @@ export const useGameEngine = () => {
     const { mpState, hostGame, joinGame, sendAction, closeLobby } = useMultiplayer(dispatch, state);
 
     const matchDispatch = (action: GameAction) => {
-        // If we are Local (no MP) or Host, we dispatch locally.
-        // If MP Host, `useMultiplayer` effect will sync state to client.
-        // If we are Client, we send action to Host (unless it's 'SYNC_STATE' which comes from Host).
-
-        if (mpState.connectionStatus === 'connected' && !mpState.isHost) {
-            // Client logic: Send to host
-            // Exception: Local only actions or optimistic updates? 
-            // For now, strict Host-authoritative.
+        // If we are connected to a game, we always "Send" the action.
+        // The sendAction function handles updating the DB (and optionally local optimistic update).
+        if (mpState.connectionStatus === 'connected' && mpState.gameId) {
             sendAction(action);
         } else {
-            // Host or Local
+            // Local play (or lobby before connection)
             dispatch(action);
         }
     };

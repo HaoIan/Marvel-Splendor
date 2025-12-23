@@ -18,27 +18,32 @@ function App() {
     return newId;
   });
 
-  const myPlayerId = isLocal ? null : mpState.peerId;
+  const myPlayerId = isLocal ? null : mpState.playerId;
 
   // Show Game if:
   // 1. We are playing locally (isLocal)
-  // 2. OR state.status is 'PLAYING' or 'GAME_OVER' (which means Host started game)
-  const showGame = isLocal || state.status !== 'LOBBY';
+  // 2. OR state.status is 'PLAYING' or 'GAME_OVER'
+  // 3. OR we are connected and in LOBBY (to show the lobby board? No, usually Lobby is UI)
+
+  // Wait, the original GameBoard handled 'isHost' internally too?
+  // Let's keep the lobby separate.
+  const showGame = isLocal || (mpState.connectionStatus === 'connected' && state.status !== 'LOBBY');
+  const showLobbyBoard = mpState.connectionStatus === 'connected' && state.status === 'LOBBY';
 
   const handleStartGame = () => {
-    if (!mpState.isHost) return;
-    // Gather players: Host + Connected Peers
-    const players = [
-      { id: mpState.peerId!, name: mpState.peerNames[mpState.peerId!] || 'Host', uuid: playerUUID },
-      ...mpState.connectedPeers.map((p, i) => ({ id: p, name: mpState.peerNames[p] || `Player ${i + 2}`, uuid: mpState.peerUUIDs?.[p] }))
-    ];
     // Dispatch Start Game
-    dispatch({ type: 'START_GAME', players });
+    // Supabase logic: Just change status to PLAYING.
+    // Ensure we have enough players?
+    if (state.players.length < 2) {
+      alert("Need at least 2 players!");
+      return;
+    }
+    dispatch({ type: 'START_GAME', players: state.players });
   };
 
   return (
     <div className="App">
-      {!showGame ? (
+      {!showGame && !showLobbyBoard ? (
         <div className="lobby-container">
           <div className="glass-panel" style={{ textAlign: 'center', maxWidth: '500px' }}>
             <h1 style={{ fontFamily: 'Impact', letterSpacing: '2px', background: 'linear-gradient(to right, #f00, #fc0)', WebkitBackgroundClip: 'text', color: 'transparent', fontSize: '3rem', margin: '0' }}>
@@ -61,64 +66,36 @@ function App() {
                   />
                 </div>
 
-                {mpState.connectionStatus === 'idle' ? (
+                {mpState.connectionStatus === 'idle' || mpState.connectionStatus === 'error' ? (
                   <>
                     <button className="btn-primary" onClick={() => {
                       if (playerName.trim()) hostGame(playerName, playerUUID);
                       else alert("Please enter your name");
-                    }}>Host Game</button>
+                    }}>Create New Game</button>
                     <div style={{ margin: '10px' }}>or</div>
                     <div style={{ display: 'flex', gap: '5px' }}>
                       <input
                         type="text"
-                        placeholder="Enter Host ID"
+                        placeholder="Enter Game Code (UUID)"
                         value={remoteId}
                         onChange={(e) => setRemoteId(e.target.value)}
                         style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', flex: 1 }}
                       />
                       <button className="btn-primary" onClick={() => {
                         if (remoteId.trim() && playerName.trim()) joinGame(remoteId, playerName, playerUUID);
-                        else alert("Please enter your name and Host ID");
+                        else alert("Please enter your name and Game Code");
                       }}>Join</button>
                     </div>
                   </>
-                ) : null}
-
-                {/* Host Waiting UI */}
-                {mpState.isHost && (mpState.connectionStatus === 'host_waiting' || mpState.connectionStatus === 'connected') && (
-                  <div>
-                    <p>Lobby Created!</p>
-                    <div style={{ background: '#222', padding: '10px', borderRadius: '5px', userSelect: 'all', cursor: 'pointer', border: '1px dashed #555', marginBottom: '10px' }}>
-                      {mpState.gameId}
-                    </div>
-                    <small>Share this ID to invite friends.</small>
-
-                    <h4 style={{ marginTop: '20px' }}>Connected Players ({mpState.connectedPeers.length + 1})</h4>
-                    <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left' }}>
-                      <li>{mpState.peerNames[mpState.peerId!] || 'Host'} (You)</li>
-                      {mpState.connectedPeers.map((p, i) => <li key={p}>{mpState.peerNames[p] || `Player ${i + 2}`}</li>)}
-                    </ul>
-
-                    {mpState.connectedPeers.length > 0 ? (
-                      <button className="btn-primary" style={{ marginTop: '20px', fontSize: '1.2rem' }} onClick={handleStartGame}>Start Game</button>
-                    ) : (
-                      <p style={{ color: '#666', fontStyle: 'italic' }}>Waiting for players...</p>
-                    )}
-                  </div>
+                ) : (
+                  <div style={{ animation: 'pulse 2s infinite' }}>Connecting...</div>
                 )}
 
-                {/* Client Waiting UI */}
-                {!mpState.isHost && (mpState.connectionStatus === 'connecting' || mpState.connectionStatus === 'connected') && (
-                  <div style={{ animation: 'pulse 2s infinite' }}>
-                    {mpState.connectionStatus === 'connecting' ? 'Connecting to Host...' : 'Connected! Waiting for Host to start...'}
-                  </div>
-                )}
-
-                {mpState.connectionStatus === 'error' && (
-                  <div style={{ color: 'red', background: 'rgba(255,0,0,0.1)', padding: '10px', borderRadius: '5px' }}>
-                    <strong>Connection Error:</strong> {mpState.errorMessage || 'Unknown error occurred.'}
+                {mpState.errorMessage && (
+                  <div style={{ marginTop: '10px', color: 'red', background: 'rgba(255,0,0,0.1)', padding: '10px', borderRadius: '5px' }}>
+                    <strong>Error:</strong> {mpState.errorMessage}
                     <br />
-                    <small onClick={() => window.location.reload()} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Refresh to retry</small>
+                    <small onClick={() => window.location.reload()} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Reset</small>
                   </div>
                 )}
               </div>
@@ -129,6 +106,36 @@ function App() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      ) : showLobbyBoard ? (
+        // Waiting Room (LOBBY status)
+        <div className="lobby-container">
+          <div className="glass-panel" style={{ textAlign: 'center' }}>
+            <h2>Waiting Room</h2>
+            <div style={{ background: '#222', padding: '10px', borderRadius: '5px', userSelect: 'all', cursor: 'pointer', border: '1px dashed #555', marginBottom: '20px' }}>
+              {mpState.gameId}
+            </div>
+            <small>Share this Game Code</small>
+
+            <div style={{ marginTop: '20px', textAlign: 'left' }}>
+              <h4>Players ({state.players.length}/4)</h4>
+              <ul>
+                {state.players.map(p => (
+                  <li key={p.id} style={{ color: p.id === playerUUID ? 'lime' : 'white' }}>
+                    {p.name} {p.id === playerUUID ? '(You)' : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {state.players.length >= 2 && (
+              mpState.isHost ? (
+                <button className="btn-primary" onClick={handleStartGame}>Start Game</button>
+              ) : (
+                <p>Waiting for host to start...</p>
+              )
+            )}
           </div>
         </div>
       ) : (
