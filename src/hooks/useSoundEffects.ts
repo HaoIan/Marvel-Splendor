@@ -115,12 +115,23 @@ export const useSoundEffects = () => {
         playTone(1046.50, 'sine', 1.0, now + 1.8, 0.3); // C6 (Final)
     }, [playTone]);
 
+    const playTurnSound = useCallback(() => {
+        // "Notification" chime
+        // Two distinct pleasant tones (E5 -> G#5)
+        const now = 0;
+        playTone(659.25, 'sine', 0.15, now, 0.2); // E5
+        playTone(830.61, 'sine', 0.4, now + 0.15, 0.2); // G#5
+        // Slight harmonic
+        playTone(659.25 / 2, 'triangle', 0.4, now, 0.05);
+    }, [playTone]);
+
     return {
         playTokenSound,
         playCardFlipSound,
         playRecruitSound,
         playReserveSound,
         playErrorSound,
-        playVictorySound
+        playVictorySound,
+        playTurnSound
     };
 };

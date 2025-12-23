@@ -232,7 +232,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const [confirmModal, setConfirmModal] = useState<{ message: string, onConfirm: () => void } | null>(null);
 
     // Sound Effects
-    const { playTokenSound, playRecruitSound, playReserveSound, playCardFlipSound, playErrorSound, playVictorySound } = useSoundEffects();
+    const { playTokenSound, playRecruitSound, playReserveSound, playCardFlipSound, playErrorSound, playVictorySound, playTurnSound } = useSoundEffects();
 
 
     // Auto-clear toast
@@ -286,6 +286,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             playVictorySound();
         }
     }, [state.status, playVictorySound]);
+
+    // Play Turn Notification Sound
+    const prevTurnRef = useRef(isMyTurn);
+    useEffect(() => {
+        // If it wasn't my turn before, and now it IS my turn, play sound.
+        // Also play on first mount if it IS my turn (for refreshes).
+        if (isMyTurn && !prevTurnRef.current) {
+            playTurnSound();
+        }
+        // Update ref
+        prevTurnRef.current = isMyTurn;
+    }, [isMyTurn, playTurnSound]);
 
     // Use useLayoutEffect to hide cards BEFORE paint to prevent flash
     React.useLayoutEffect(() => {
