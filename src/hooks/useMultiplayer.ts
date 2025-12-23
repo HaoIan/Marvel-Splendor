@@ -23,49 +23,47 @@ export const useMultiplayer = (
         isHost: false
     });
 
+    const pollingRef = useRef<any>(null);
+
     const gameStateRef = useRef(gameState);
     useEffect(() => {
         gameStateRef.current = gameState;
     }, [gameState]);
 
+    // Auto-reconnect based on storage
+    useEffect(() => {
+        const savedGameId = sessionStorage.getItem('splendor_gameId');
+        const savedPlayerId = sessionStorage.getItem('splendor_playerUUID');
+        const savedIsHost = sessionStorage.getItem('splendor_isHost') === 'true';
+        const savedName = sessionStorage.getItem('splendor_playerName');
+
+        if (savedGameId && savedPlayerId && savedName) {
+            console.log("Restoring session:", savedGameId);
+            // We reuse joinGame logic, but need to be careful not to create loop
+            joinGame(savedGameId, savedName, savedPlayerId, savedIsHost);
+        }
+    }, []);
+
     // Cleanup subscription on unmount
     useEffect(() => {
         return () => {
             if (mpState.gameId) {
+                // Do not unsubscribe here strictly if we want to allow refresh?
+                // Actually React strict mode might mount/unmount.
+                // It is safer to unsubscribe to avoid dupes, but Supabase handles it well.
                 supabase.channel(`game:${mpState.gameId}`).unsubscribe();
             }
+            if (pollingRef.current) clearInterval(pollingRef.current);
         };
     }, [mpState.gameId]);
-
-    // Auto-reconnect on mount
-    useEffect(() => {
-        const savedGameId = sessionStorage.getItem('splendor_gameId');
-        const savedPlayerName = sessionStorage.getItem('splendor_playerName');
-        const savedPlayerUUID = sessionStorage.getItem('splendor_playerUUID');
-        const savedIsCreator = sessionStorage.getItem('splendor_isHost') === 'true';
-
-        if (savedGameId && savedPlayerName && savedPlayerUUID) {
-            console.log("Restoring session:", savedGameId);
-            joinGame(savedGameId, savedPlayerName, savedPlayerUUID, savedIsCreator);
-        }
-    }, []);
 
     const hostGame = async (playerName: string, playerUUID: string) => {
         setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: undefined }));
 
-        // 1. Create Initial State
-        // We use the current LOCAL state as the template, but we need to ensure players are set up correctly.
-        // Actually, the lobby logic is different now. We probably want to start with a blank slate or pre-filled state.
-        // For simplicity, let's assume the App passes us a valid initial state or we trigger START_GAME later.
-        // But wait, "Lobby" in Supabase mean we need a way to gather players BEFORE creating the 'matches' row?
-        // OR, we create the row, and players 'join' by updating the 'players' array in the JSON?
-
-        // Let's go with: Create row with "Lobby" status.
         const defaultState = gameStateRef.current;
-        // Ensure Host is player 1
         const initialState = {
             ...defaultState,
-            players: [{ id: playerUUID /* Use UUID as ID */, name: playerName, tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 }, hand: [], tableau: [], points: 0, noble: null }],
+            players: [{ id: playerUUID, name: playerName, tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 }, hand: [], tableau: [], points: 0, noble: null }],
             status: 'LOBBY'
         };
 
@@ -81,14 +79,13 @@ export const useMultiplayer = (
             return;
         }
 
-        // 2. Join it
         joinGame(data.id, playerName, playerUUID, true);
     };
 
     const joinGame = async (gameId: string, playerName: string, playerUUID: string, isCreator = false) => {
         setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: undefined }));
 
-        // 1. Fetch current state to see if valid and add ourselves if needed
+        // 1. Fetch current state
         const { data, error } = await supabase
             .from('matches')
             .select('game_state')
@@ -97,16 +94,23 @@ export const useMultiplayer = (
 
         if (error || !data) {
             setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game not found' }));
+            sessionStorage.removeItem('splendor_gameId'); // Clear invalid
             return;
         }
 
         let syncedState = data.game_state as GameState;
 
-        // If in LOBBY, add ourselves if not present
+        // Check if aborted
+        if (syncedState.status === 'ABORTED') {
+            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game was aborted by host.' }));
+            sessionStorage.removeItem('splendor_gameId');
+            return;
+        }
+
+        // Logic to add player (if new)
         if (syncedState.status === 'LOBBY' || syncedState.status === 'PLAYING') {
             const existingPlayerIndex = syncedState.players.findIndex(p => p.id === playerUUID);
             if (existingPlayerIndex === -1) {
-                // Add player
                 if (syncedState.players.length >= 4) {
                     setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game full' }));
                     return;
@@ -114,40 +118,72 @@ export const useMultiplayer = (
                 syncedState.players.push({
                     id: playerUUID,
                     name: playerName,
-                    tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 } as any, // Type hack if needed, or use proper initializers
+                    tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 } as any,
                     hand: [],
                     tableau: [],
-                    points: 0
+                    points: 0,
+                    isHuman: true
                 } as any);
 
-                // Update DB
                 await supabase
                     .from('matches')
                     .update({ game_state: syncedState })
                     .eq('id', gameId);
-            } else {
-                // Update name?
-                // syncedState.players[existingPlayerIndex].name = playerName;
             }
         }
 
-        // 2. Subscribe to changes
-        const channel = supabase
+        // 2. Subscribe
+        supabase
             .channel(`game:${gameId}`)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches', filter: `id=eq.${gameId}` }, (payload) => {
                 const newState = payload.new.game_state as GameState;
+
+                if (newState.status === 'ABORTED') {
+                    alert("The Host has ended the game.");
+                    sessionStorage.removeItem('splendor_gameId');
+                    sessionStorage.removeItem('splendor_isHost');
+                    window.location.reload();
+                    return;
+                }
+
                 dispatch({ type: 'SYNC_STATE', state: newState });
             })
-            .subscribe();
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // console.log("Realtime connected");
+                }
+            });
 
-        // 3. Sync local
         dispatch({ type: 'SYNC_STATE', state: syncedState });
+
+        // 3. Polling Fallback (Every 3s)
+        const interval = setInterval(async () => {
+            const { data, error } = await supabase
+                .from('matches')
+                .select('game_state')
+                .eq('id', gameId)
+                .single();
+
+            if (data && !error) {
+                const remoteState = data.game_state as GameState;
+                if (remoteState.status === 'ABORTED') {
+                    alert("The Host has ended the game.");
+                    sessionStorage.removeItem('splendor_gameId');
+                    sessionStorage.removeItem('splendor_isHost');
+                    window.location.reload();
+                } else {
+                    dispatch({ type: 'SYNC_STATE', state: remoteState });
+                }
+            }
+        }, 3000);
+
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = interval;
 
         // Save session
         sessionStorage.setItem('splendor_gameId', gameId);
+        sessionStorage.setItem('splendor_isHost', String(isCreator));
         sessionStorage.setItem('splendor_playerName', playerName);
-        if (isCreator) sessionStorage.setItem('splendor_isHost', 'true');
-        else sessionStorage.removeItem('splendor_isHost');
 
         setMpState({
             playerId: playerUUID,
@@ -160,22 +196,13 @@ export const useMultiplayer = (
     const sendAction = async (action: GameAction) => {
         if (!mpState.gameId) return;
 
-        // 1. Run Optimistic Local Update
-        // We use the gameReducer logic to verify validity and calculate next state
-        // IMPORTANT: We need `gameReducer` to be pure.
+        // Validation & Reducer Logic handled by checking against ref or just trying optimistic update
         const prevState = gameStateRef.current;
-
-        // Validation: Is it my turn? (Only for game moves, not startup)
-        // Note: gameReducer generally handles logic, but simple turn check is good UX
-        // However, we'll let existing UI handle visuals.
-
         try {
             const nextState = gameReducer(prevState, action);
 
-            // 2. Push to Supabase
-            // We push the WHOLE state.
-            // Race condition risk: High if high frequency.
-            // Mitigation: Splendor is turn based. Low risk.
+            // Optimistic Update: Update local UI immediately
+            dispatch(action);
 
             const { error } = await supabase
                 .from('matches')
@@ -184,13 +211,8 @@ export const useMultiplayer = (
 
             if (error) {
                 console.error("Failed to sync move:", error);
-                // Ideally revert local state if we optimistically updated? 
-                // But we actully relay on the subscription to confirm.
-                // If we want immediate feedback, we dispatch locally too:
-                // dispatch(action); 
-                // BUT dispatching locally might cause jump if remote state differs.
-                // Safest: Dispatch locally (Optimistic), Subscription will overwrite if needed.
-                dispatch(action);
+                // If failed, we should theoretically rollback, but for now we just log.
+                // The next successful sync (if any) or reload would fix it.
             }
         } catch (e) {
             console.error("Invalid move or reducer error", e);
@@ -198,9 +220,16 @@ export const useMultiplayer = (
     };
 
     const closeLobby = async () => {
-        // Just leave? delete?
-        // For now, just reload.
+        if (mpState.isHost && mpState.gameId) {
+            // Host Aborts
+            const abortedState = { ...gameStateRef.current, status: 'ABORTED' };
+            await supabase.from('matches').update({ game_state: abortedState }).eq('id', mpState.gameId);
+        }
+
+        // Clear local and reload
         setMpState({ playerId: null, gameId: null, connectionStatus: 'idle', isHost: false });
+        sessionStorage.removeItem('splendor_gameId');
+        sessionStorage.removeItem('splendor_isHost');
         window.location.reload();
     };
 

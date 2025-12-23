@@ -68,6 +68,6 @@ export interface GameState {
   turn: number;
   winner: string | null;
   logs: string[];
-  status: 'LOBBY' | 'PLAYING' | 'GAME_OVER';
+  status: 'LOBBY' | 'PLAYING' | 'GAME_OVER' | 'ABORTED';
   finalRound?: boolean;
 }

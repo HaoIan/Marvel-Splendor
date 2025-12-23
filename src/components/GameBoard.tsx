@@ -477,7 +477,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         playTokenSound(); // Confirm sound
 
         setSelectedTokens({});
-        dispatch({ type: 'END_TURN' });
+        // dispatch({ type: 'END_TURN' }); // Handled by reducer automatically
     };
 
     const handleCardClick = (card: CardType) => {
@@ -539,7 +539,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             playReserveSound();
             triggerAnimation('card', selectedCard.imageUrl || '', 'modal-card-view', `player-area-${playerId}`);
         }
-        dispatch({ type: 'END_TURN' });
+        // dispatch({ type: 'END_TURN' }); // Handled by reducer automatically
         setSelectedCard(null);
     };
 

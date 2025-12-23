@@ -105,12 +105,19 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             const newPlayers = [...state.players];
             newPlayers[playerIndex] = player;
 
-            return {
+            const stateWithTokens = {
                 ...state,
                 tokens: newTokens,
                 players: newPlayers,
                 logs: [...state.logs, `${player.name} took tokens.`]
             };
+
+            // Auto End Turn
+            // const endTurnAction = { type: 'END_TURN' } as const;
+            // We can recursively call reducer? Or duplicate logic.
+            // Duplicate logic is safer to avoid deeper stack or confusion.
+            // Actually, we can just extract End Turn logic to a helper.
+            return processEndTurn(stateWithTokens);
         }
 
         case 'RECRUIT_CARD': {
@@ -198,7 +205,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             const newPlayers = [...state.players];
             newPlayers[playerIndex] = player;
 
-            return {
+            const stateWithRecruit = {
                 ...state,
                 players: newPlayers,
                 tokens: newBank,
@@ -206,6 +213,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 decks: newDecks,
                 logs: [...state.logs, `${player.name} recruited ${card.points}pt card.`]
             };
+            return processEndTurn(stateWithRecruit);
         }
 
         case 'RESERVE_CARD': {
@@ -249,7 +257,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             const newPlayers = [...state.players];
             newPlayers[playerIndex] = player;
 
-            return {
+            const stateWithReserve = {
                 ...state,
                 players: newPlayers,
                 tokens: newTokens,
@@ -257,6 +265,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 decks: newDecks,
                 logs: [...state.logs, `${player.name} reserved a card.`]
             };
+            return processEndTurn(stateWithReserve);
         }
 
         case 'END_TURN': {
@@ -333,4 +342,52 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
         default:
             return state;
     }
+};
+
+const processEndTurn = (state: GameState): GameState => {
+    const player = state.players[state.currentPlayerIndex];
+    let nextState = { ...state };
+
+    // Check Win Condition Trigger: 16 Points + Green Stone
+    // If condition met, and not already in final round, trigger final round.
+    if (!state.finalRound && player.points >= 16 && player.tokens.green > 0) {
+        nextState.finalRound = true;
+        nextState.logs = [...nextState.logs, `${player.name} has triggered the end game! Finishing the round...`];
+    }
+
+    const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
+
+    // Check if Round Ended (back to player 0)
+    if (nextIndex === 0) {
+        // If we are in final round, game ends now.
+        if (nextState.finalRound) {
+            // Determine Winner
+            // Tie-breaker: Most points -> Fewest Development Cards (Tableau size)
+            const sortedPlayers = [...nextState.players].sort((a, b) => {
+                if (b.points !== a.points) return b.points - a.points;
+                return a.tableau.length - b.tableau.length; // Fewer cards is better
+            });
+
+            const winners = sortedPlayers.filter(p =>
+                p.points === sortedPlayers[0].points &&
+                p.tableau.length === sortedPlayers[0].tableau.length
+            );
+
+            const winnerNames = winners.map(p => p.name).join(' & ');
+
+            return {
+                ...nextState,
+                currentPlayerIndex: nextIndex, // Reset to 0 just in case
+                winner: winnerNames,
+                status: 'GAME_OVER',
+                logs: [...nextState.logs, `Round Complete. GAME OVER! ${winnerNames} WINS with ${winners[0].points} points!`]
+            };
+        }
+    }
+
+    return {
+        ...nextState,
+        currentPlayerIndex: nextIndex,
+        turn: nextIndex === 0 ? state.turn + 1 : state.turn
+    };
 };
