@@ -4,18 +4,20 @@ import type { GameAction } from '../hooks/gameReducer';
 import { AnimationOverlay, type AnimationItem } from './AnimationOverlay';
 import { useSoundEffects } from '../hooks/useSoundEffects'; // Import Sound Hook
 import { v4 as uuidv4 } from 'uuid';
-import cardBack1 from '../assets/card-back-1.png';
-import cardBack2 from '../assets/card-back-2.png';
-import cardBack3 from '../assets/card-back-3.png';
+
+// Card Back Assets
+import cardBack1 from '../assets/card-backs/card-back-1.png';
+import cardBack2 from '../assets/card-backs/card-back-2.png';
+import cardBack3 from '../assets/card-backs/card-back-3.png';
 
 // Token Assets
-import mindToken from '../assets/mind-token.png';
-import powerToken from '../assets/power-token.png';
-import realityToken from '../assets/reality-token.png';
-import shieldToken from '../assets/shield-token.png';
-import soulToken from '../assets/soul-token.png';
-import spaceToken from '../assets/space-token.png';
-import timeToken from '../assets/time-token.png';
+import mindToken from '../assets/tokens/mind-token.png';
+import powerToken from '../assets/tokens/power-token.png';
+import realityToken from '../assets/tokens/reality-token.png';
+import shieldToken from '../assets/tokens/shield-token.png';
+import soulToken from '../assets/tokens/soul-token.png';
+import spaceToken from '../assets/tokens/space-token.png';
+import timeToken from '../assets/tokens/time-token.png';
 
 const TOKEN_IMAGES: Record<string, string> = {
     yellow: mindToken,
