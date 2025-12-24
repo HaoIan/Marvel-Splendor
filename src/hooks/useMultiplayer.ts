@@ -69,7 +69,7 @@ export const useMultiplayer = (
             players: [{ id: playerUUID, name: playerName, tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 }, hand: [], tableau: [], points: 0, noble: null }],
             status: 'LOBBY',
             config: { turnLimitSeconds },
-            turnDeadline: Date.now() + (turnLimitSeconds * 1000)
+            turnDeadline: turnLimitSeconds > 0 ? Date.now() + (turnLimitSeconds * 1000) : undefined
         };
 
         const { data, error } = await supabase

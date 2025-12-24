@@ -65,7 +65,7 @@ export const createInitialState = (
         logs: ['Game initialized.'],
         status: 'LOBBY',
         config,
-        turnDeadline: Date.now() + (config.turnLimitSeconds * 1000)
+        turnDeadline: config.turnLimitSeconds > 0 ? Date.now() + (config.turnLimitSeconds * 1000) : undefined
     };
 };
 
@@ -411,6 +411,6 @@ const processEndTurn = (state: GameState): GameState => {
         ...nextState,
         currentPlayerIndex: nextIndex,
         turn: nextIndex === 0 ? state.turn + 1 : state.turn,
-        turnDeadline: Date.now() + (state.config.turnLimitSeconds * 1000)
+        turnDeadline: state.config.turnLimitSeconds > 0 ? Date.now() + (state.config.turnLimitSeconds * 1000) : undefined
     };
 };
