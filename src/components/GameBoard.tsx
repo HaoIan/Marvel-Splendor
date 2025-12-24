@@ -229,17 +229,15 @@ const GameTimer = ({
     return (
         <div style={styles}>
             <span>{isMyTurn ? "Your Turn" : `${playerName}'s Turn`}</span>
-            {isMyTurn && (
-                <span style={{
-                    fontFamily: 'monospace',
-                    fontSize: '1.2rem',
-                    background: 'rgba(255,255,255,0.1)',
-                    padding: '2px 8px',
-                    borderRadius: '4px'
-                }}>
-                    {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                </span>
-            )}
+            <span style={{
+                fontFamily: 'monospace',
+                fontSize: '1.2rem',
+                background: 'rgba(255,255,255,0.1)',
+                padding: '2px 8px',
+                borderRadius: '4px'
+            }}>
+                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            </span>
         </div>
     );
 };
