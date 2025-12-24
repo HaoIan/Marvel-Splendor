@@ -189,58 +189,57 @@ const PlayerArea = ({ player, isActive, onCardClick, isMe }: { player: Player, i
     </div>
 );
 
-const GameTimer = ({ turnDeadline, isMyTurn, onTimeUp }: { turnDeadline?: number; isMyTurn: boolean; onTimeUp: () => void }) => {
-    const [timeLeft, setTimeLeft] = useState(0);
+// Helper for color interpolation
+const getTimerColor = (percentage: number) => {
+    // 1.0 = Green (120), 0.0 = Red (0)
+    // We can clamp it a bit to avoid pure yellow in the middle if we want, but linear 120->0 is standard "health bar" style.
+    const hue = Math.max(0, Math.min(120, percentage * 120));
+    return `hsl(${hue}, 90%, 45%)`;
+};
 
-    useEffect(() => {
-        if (!turnDeadline) return;
+// Dumb Presentational Component
+const GameTimer = ({
+    timeLeft,
+    isMyTurn,
+    playerName,
+    dynamicColor
+}: {
+    timeLeft: number;
+    totalSeconds?: number;
+    isMyTurn: boolean;
+    playerName: string;
+    dynamicColor: string;
+}) => {
+    // Base styles
+    const styles: React.CSSProperties = {
+        position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)',
+        padding: '8px 24px', borderRadius: '30px',
+        fontSize: '1rem', fontWeight: 'bold',
+        pointerEvents: 'none', zIndex: 1000,
+        display: 'flex', alignItems: 'center', gap: '12px',
+        transition: 'all 1s linear',
 
-        const requestLoop = () => {
-            const remaining = Math.max(0, Math.ceil((turnDeadline - Date.now()) / 1000));
-            setTimeLeft(remaining);
-
-            if (remaining <= 0 && isMyTurn) {
-                onTimeUp();
-            } else if (remaining > 0) {
-                requestAnimationFrame(requestLoop);
-            }
-        };
-        // Use animation frame for smoother countdown if we want, or just interval
-        // Interval is fine for seconds.
-        const timer = setInterval(() => {
-            const remaining = Math.max(0, Math.ceil((turnDeadline - Date.now()) / 1000));
-            setTimeLeft(remaining);
-            if (remaining <= 0 && isMyTurn) {
-                onTimeUp();
-                clearInterval(timer);
-            }
-        }, 1000);
-
-        // Initial
-        const initial = Math.max(0, Math.ceil((turnDeadline - Date.now()) / 1000));
-        setTimeLeft(initial);
-
-        return () => clearInterval(timer);
-    }, [turnDeadline, isMyTurn]); // stable onTimeUp expected
-
-    if (!turnDeadline) return null;
-    if (timeLeft <= 0) return null; // Don't show 0 or negative
-
-    const isUrgent = timeLeft <= 10;
+        // Dynamic colors
+        background: isMyTurn ? `rgba(0,0,0,0.8)` : 'rgba(0,0,0,0.6)',
+        border: `2px solid ${isMyTurn ? dynamicColor : '#555'}`,
+        color: isMyTurn ? dynamicColor : '#aaa',
+        boxShadow: isMyTurn ? `0 0 15px ${dynamicColor}` : 'none',
+    };
 
     return (
-        <div style={{
-            position: 'absolute', top: '60px', left: '50%', transform: 'translateX(-50%)',
-            background: isUrgent ? 'rgba(200, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)',
-            color: 'white',
-            padding: '4px 12px', borderRadius: '10px',
-            fontSize: '1.2rem', fontWeight: 'bold',
-            pointerEvents: 'none', zIndex: 1000,
-            border: isUrgent ? '1px solid red' : '1px solid #555',
-            animation: isUrgent ? 'pulse 0.5s infinite' : 'none',
-            minWidth: '60px', textAlign: 'center'
-        }}>
-            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+        <div style={styles}>
+            <span>{isMyTurn ? "Your Turn" : `${playerName}'s Turn`}</span>
+            {isMyTurn && (
+                <span style={{
+                    fontFamily: 'monospace',
+                    fontSize: '1.2rem',
+                    background: 'rgba(255,255,255,0.1)',
+                    padding: '2px 8px',
+                    borderRadius: '4px'
+                }}>
+                    {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                </span>
+            )}
         </div>
     );
 };
@@ -272,6 +271,32 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     })();
 
     const viewingPlayer = state.players[viewingPlayerIndex] || state.players[state.currentPlayerIndex];
+
+    // Timer Logic Lifted Up
+    const [timeLeft, setTimeLeft] = useState(0);
+
+    useEffect(() => {
+        if (!state.turnDeadline) return;
+
+        const updateTimer = () => {
+            const remaining = Math.max(0, Math.ceil((state.turnDeadline! - Date.now()) / 1000));
+            setTimeLeft(remaining);
+
+            if (remaining <= 0 && isMyTurn) {
+                console.log("Timer expired.");
+                dispatch({ type: 'PASS_TURN' });
+            }
+        };
+
+        const timer = setInterval(updateTimer, 1000);
+        updateTimer(); // Initial call
+
+        return () => clearInterval(timer);
+    }, [state.turnDeadline, isMyTurn, dispatch]); // Added dispatch
+
+    const totalSeconds = state.config.turnLimitSeconds;
+    const percentage = Math.max(0, Math.min(1, timeLeft / totalSeconds));
+    const dynamicColor = getTimerColor(percentage);
 
 
     const [selectedTokens, setSelectedTokens] = useState<Partial<TokenBank>>({});
@@ -615,7 +640,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         <div className="game-layout">
             <AnimationOverlay items={animations} onComplete={handleAnimationComplete} />
             {/* Turn Indicator Overlay */}
-            {isMyTurn && <div className="turn-indicator-overlay"></div>}
+            {isMyTurn && (
+                <div
+                    className="turn-indicator-overlay"
+                    style={{
+                        boxShadow: `inset 0 0 0 4px ${dynamicColor}, inset 0 0 50px ${dynamicColor}`,
+                        transition: 'box-shadow 1s linear'
+                    }}
+                ></div>
+            )}
 
             {/* Custom Toast */}
             {toast && (
@@ -647,28 +680,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 </div>
             )}
 
-            {/* Status Text */}
-            <div style={{
-                position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)',
-                background: isMyTurn ? 'rgba(50, 200, 50, 0.9)' : 'rgba(0, 0, 0, 0.6)',
-                color: isMyTurn ? 'white' : '#aaa',
-                padding: '8px 24px', borderRadius: '30px',
-                fontSize: '1rem', fontWeight: isMyTurn ? 'bold' : 'normal',
-                pointerEvents: 'none', zIndex: 1000, /* High z-index to sit above overlay */
-                boxShadow: isMyTurn ? '0 0 20px var(--marvel-green)' : 'none',
-                border: isMyTurn ? '1px solid #fff' : '1px solid rgba(255,255,255,0.1)'
-            }}>
-                {isMyTurn ? "Your Turn!" : `${state.players[state.currentPlayerIndex].name}'s Turn`}
-            </div>
-
+            {/* Turn Indicator & Timer */}
             <GameTimer
-                turnDeadline={state.turnDeadline}
+                timeLeft={timeLeft}
+                totalSeconds={state.config.turnLimitSeconds}
                 isMyTurn={isMyTurn}
-                onTimeUp={() => {
-                    // Adding a small debounce/check effectively happens in reducer, but good to log
-                    console.log("Timer expired.");
-                    dispatch({ type: 'PASS_TURN' });
-                }}
+                playerName={state.players[state.currentPlayerIndex].name}
+                dynamicColor={dynamicColor}
             />
 
             {/* Host Quit Button */}
