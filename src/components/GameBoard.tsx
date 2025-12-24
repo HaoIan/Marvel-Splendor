@@ -189,6 +189,62 @@ const PlayerArea = ({ player, isActive, onCardClick, isMe }: { player: Player, i
     </div>
 );
 
+const GameTimer = ({ turnDeadline, isMyTurn, onTimeUp }: { turnDeadline?: number; isMyTurn: boolean; onTimeUp: () => void }) => {
+    const [timeLeft, setTimeLeft] = useState(0);
+
+    useEffect(() => {
+        if (!turnDeadline) return;
+
+        const requestLoop = () => {
+            const remaining = Math.max(0, Math.ceil((turnDeadline - Date.now()) / 1000));
+            setTimeLeft(remaining);
+
+            if (remaining <= 0 && isMyTurn) {
+                onTimeUp();
+            } else if (remaining > 0) {
+                requestAnimationFrame(requestLoop);
+            }
+        };
+        // Use animation frame for smoother countdown if we want, or just interval
+        // Interval is fine for seconds.
+        const timer = setInterval(() => {
+            const remaining = Math.max(0, Math.ceil((turnDeadline - Date.now()) / 1000));
+            setTimeLeft(remaining);
+            if (remaining <= 0 && isMyTurn) {
+                onTimeUp();
+                clearInterval(timer);
+            }
+        }, 1000);
+
+        // Initial
+        const initial = Math.max(0, Math.ceil((turnDeadline - Date.now()) / 1000));
+        setTimeLeft(initial);
+
+        return () => clearInterval(timer);
+    }, [turnDeadline, isMyTurn]); // stable onTimeUp expected
+
+    if (!turnDeadline) return null;
+    if (timeLeft <= 0) return null; // Don't show 0 or negative
+
+    const isUrgent = timeLeft <= 10;
+
+    return (
+        <div style={{
+            position: 'absolute', top: '60px', left: '50%', transform: 'translateX(-50%)',
+            background: isUrgent ? 'rgba(200, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)',
+            color: 'white',
+            padding: '4px 12px', borderRadius: '10px',
+            fontSize: '1.2rem', fontWeight: 'bold',
+            pointerEvents: 'none', zIndex: 1000,
+            border: isUrgent ? '1px solid red' : '1px solid #555',
+            animation: isUrgent ? 'pulse 0.5s infinite' : 'none',
+            minWidth: '60px', textAlign: 'center'
+        }}>
+            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+        </div>
+    );
+};
+
 interface GameBoardProps {
     state: GameState;
     dispatch: (action: GameAction) => void;
@@ -604,6 +660,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             }}>
                 {isMyTurn ? "Your Turn!" : `${state.players[state.currentPlayerIndex].name}'s Turn`}
             </div>
+
+            <GameTimer
+                turnDeadline={state.turnDeadline}
+                isMyTurn={isMyTurn}
+                onTimeUp={() => {
+                    // Adding a small debounce/check effectively happens in reducer, but good to log
+                    console.log("Timer expired.");
+                    dispatch({ type: 'PASS_TURN' });
+                }}
+            />
 
             {/* Host Quit Button */}
             {isHost && closeLobby && (

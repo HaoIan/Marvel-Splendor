@@ -70,4 +70,9 @@ export interface GameState {
   logs: string[];
   status: 'LOBBY' | 'PLAYING' | 'GAME_OVER' | 'ABORTED';
   finalRound?: boolean;
+  turnDeadline?: number; // Unix timestamp for when the turn ends
+  config: {
+    turnLimitSeconds: number;
+    // other config options can go here
+  };
 }

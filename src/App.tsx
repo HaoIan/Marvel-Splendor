@@ -30,6 +30,7 @@ function App() {
   const { state, dispatch, mpState, hostGame, joinGame, closeLobby } = useGameEngine(playerUUID);
   const [remoteId, setRemoteId] = useState('');
   const [playerName, setPlayerName] = useState('');
+  const [turnLimit, setTurnLimit] = useState(60);
   const [isLocal, setIsLocal] = useState(false);
 
   const myPlayerId = isLocal ? null : mpState.playerId;
@@ -84,8 +85,65 @@ function App() {
                   <div style={{ color: '#aaa' }}>Establishing secure connection...</div>
                 ) : mpState.connectionStatus === 'idle' || mpState.connectionStatus === 'error' ? (
                   <>
+                    {/* Timer Selection */}
+                    <div style={{ marginBottom: '20px', color: '#ccc', fontSize: '0.9rem' }}>
+                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Turn Timer (seconds)</label>
+                      <div style={{
+                        display: 'inline-flex',
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: '25px',
+                        border: '1px solid #444',
+                        overflow: 'hidden'
+                      }}>
+                        {[30, 60, 90, 120].map(val => (
+                          <button
+                            key={val}
+                            onClick={() => setTurnLimit(val)}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: 0,
+                              border: 'none',
+                              borderRight: '1px solid #555',
+                              background: turnLimit === val ? '#4facfe' : 'transparent',
+                              color: turnLimit === val ? 'white' : '#aaa',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              fontWeight: turnLimit === val ? 'bold' : 'normal',
+                              transition: 'all 0.2s',
+                              minWidth: '50px'
+                            }}
+                          >
+                            {val}s
+                          </button>
+                        ))}
+
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', background: ![30, 60, 90, 120].includes(turnLimit) ? '#4facfe' : 'transparent' }}>
+                          <input
+                            type="number"
+                            min="10"
+                            max="600"
+                            value={turnLimit}
+                            onChange={(e) => setTurnLimit(Math.max(0, parseInt(e.target.value) || 0))}
+                            style={{
+                              width: '60px',
+                              padding: '8px 10px',
+                              border: 'none',
+                              background: 'transparent',
+                              color: ![30, 60, 90, 120].includes(turnLimit) ? 'white' : '#aaa',
+                              textAlign: 'center',
+                              fontSize: '0.85rem',
+                              fontWeight: ![30, 60, 90, 120].includes(turnLimit) ? 'bold' : 'normal',
+                              outline: 'none',
+                              MozAppearance: 'textfield'
+                            }}
+                            placeholder="Custom"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <button className="btn-primary" onClick={() => {
-                      if (playerName.trim()) hostGame(playerName, playerUUID);
+                      if (playerName.trim()) hostGame(playerName, playerUUID, turnLimit);
                       else alert("Please enter your name");
                     }}>Create New Game</button>
                     <div style={{ margin: '10px' }}>or</div>

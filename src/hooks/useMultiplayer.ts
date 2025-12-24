@@ -60,14 +60,16 @@ export const useMultiplayer = (
         };
     }, [mpState.gameId]);
 
-    const hostGame = async (playerName: string, playerUUID: string) => {
+    const hostGame = async (playerName: string, playerUUID: string, turnLimitSeconds: number = 60) => {
         setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: undefined }));
 
         const defaultState = gameStateRef.current;
         const initialState = {
             ...defaultState,
             players: [{ id: playerUUID, name: playerName, tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 }, hand: [], tableau: [], points: 0, noble: null }],
-            status: 'LOBBY'
+            status: 'LOBBY',
+            config: { turnLimitSeconds },
+            turnDeadline: Date.now() + (turnLimitSeconds * 1000)
         };
 
         const { data, error } = await supabase

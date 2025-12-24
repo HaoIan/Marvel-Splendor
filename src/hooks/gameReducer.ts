@@ -9,7 +9,7 @@ export type GameAction =
     | { type: 'END_TURN' }
     | { type: 'SYNC_STATE'; state: GameState }
     | { type: 'PLAYER_JOINED'; player: Player }
-    | { type: 'START_GAME'; players: { id: string; name: string; uuid?: string }[] }
+    | { type: 'START_GAME'; players: { id: string; name: string; uuid?: string }[]; config?: { turnLimitSeconds: number } }
     | { type: 'RECONNECT_PLAYER'; oldId: string; newId: string }
     | { type: 'PASS_TURN' };
 
@@ -22,7 +22,10 @@ const shuffle = (array: any[]) => {
     return array;
 };
 
-export const createInitialState = (playerConfig: { id: string; name: string; uuid?: string }[]): GameState => {
+export const createInitialState = (
+    playerConfig: { id: string; name: string; uuid?: string }[],
+    config: { turnLimitSeconds: number } = { turnLimitSeconds: 60 }
+): GameState => {
     const shuffledDeck = shuffle([...INITIAL_DECK]);
 
     const deck1 = shuffledDeck.filter((c: Card) => c.tier === 1);
@@ -60,7 +63,9 @@ export const createInitialState = (playerConfig: { id: string; name: string; uui
         turn: 1,
         winner: null,
         logs: ['Game initialized.'],
-        status: 'LOBBY'
+        status: 'LOBBY',
+        config,
+        turnDeadline: Date.now() + (config.turnLimitSeconds * 1000)
     };
 };
 
@@ -79,7 +84,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
 
         case 'START_GAME':
             return {
-                ...createInitialState(action.players),
+                ...createInitialState(action.players, action.config),
                 status: 'PLAYING'
             };
 
@@ -405,6 +410,7 @@ const processEndTurn = (state: GameState): GameState => {
     return {
         ...nextState,
         currentPlayerIndex: nextIndex,
-        turn: nextIndex === 0 ? state.turn + 1 : state.turn
+        turn: nextIndex === 0 ? state.turn + 1 : state.turn,
+        turnDeadline: Date.now() + (state.config.turnLimitSeconds * 1000)
     };
 };
