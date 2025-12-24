@@ -31,9 +31,17 @@ function App() {
   const [remoteId, setRemoteId] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [turnLimit, setTurnLimit] = useState(60);
+  const [formError, setFormError] = useState('');
   const [isLocal, setIsLocal] = useState(false);
 
+  // Clear error when name or id changes
+  useEffect(() => {
+    if (formError) setFormError('');
+  }, [playerName, remoteId]);
+
   const myPlayerId = isLocal ? null : mpState.playerId;
+
+
 
   // Show Game if:
   // 1. We are playing locally (isLocal)
@@ -50,7 +58,8 @@ function App() {
     // Supabase logic: Just change status to PLAYING.
     // Ensure we have enough players?
     if (state.players.length < 2) {
-      alert("Need at least 2 players!");
+      alert("Need at least 2 players!"); // Host side alert is less problematic, but ideally inline too.
+      // But this is inside the specialized lobby view.
       return;
     }
     dispatch({ type: 'START_GAME', players: state.players });
@@ -142,9 +151,15 @@ function App() {
                       </div>
                     </div>
 
+                    {formError && (
+                      <div style={{ color: '#ff5555', marginBottom: '10px', fontSize: '0.9rem', background: 'rgba(255,0,0,0.1)', padding: '5px', borderRadius: '4px' }}>
+                        {formError}
+                      </div>
+                    )}
+
                     <button className="btn-primary" onClick={() => {
                       if (playerName.trim()) hostGame(playerName, playerUUID, turnLimit);
-                      else alert("Please enter your name");
+                      else setFormError("Please enter your name first!");
                     }}>Create New Game</button>
                     <div style={{ margin: '10px' }}>or</div>
                     <div style={{ display: 'flex', gap: '5px' }}>
@@ -157,7 +172,7 @@ function App() {
                       />
                       <button className="btn-primary" onClick={() => {
                         if (remoteId.trim() && playerName.trim()) joinGame(remoteId, playerName, playerUUID);
-                        else alert("Please enter your name and Game Code");
+                        else setFormError("Please enter your name and Game Code!");
                       }}>Join</button>
                     </div>
                   </>
