@@ -125,6 +125,13 @@ export const useSoundEffects = () => {
         playTone(659.25 / 2, 'triangle', 0.4, now, 0.05);
     }, [playTone]);
 
+    const playTickSound = useCallback(() => {
+        // Mechanical Tick
+        // High ticking sound (Woodblock-ish)
+        playTone(1200, 'square', 0.03, 0, 0.05);
+        playTone(200, 'triangle', 0.03, 0, 0.1); // Body
+    }, [playTone]);
+
     return {
         playTokenSound,
         playCardFlipSound,
@@ -132,6 +139,7 @@ export const useSoundEffects = () => {
         playReserveSound,
         playErrorSound,
         playVictorySound,
-        playTurnSound
+        playTurnSound,
+        playTickSound
     };
 };

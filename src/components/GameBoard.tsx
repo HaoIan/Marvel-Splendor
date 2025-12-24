@@ -254,6 +254,9 @@ interface GameBoardProps {
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId, myUUID, closeLobby, isHost }) => {
+    // Sound Effects
+    const { playTokenSound, playRecruitSound, playReserveSound, playCardFlipSound, playErrorSound, playVictorySound, playTurnSound, playTickSound } = useSoundEffects();
+
     const isMyTurn = state.players[state.currentPlayerIndex].id === myPeerId || (myPeerId === null && state.currentPlayerIndex === 0);
 
     // Determine the viewing player (Me in multiplayer, or Current Player in hotseat)
@@ -282,6 +285,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             const remaining = Math.max(0, Math.ceil((state.turnDeadline! - Date.now()) / 1000));
             setTimeLeft(remaining);
 
+            // Clock Tick Effect
+            // Play tick if:
+            // 1. It is my turn
+            // 2. Time is low (<= 10 seconds)
+            // 3. Time > 0 (don't tick on 0)
+            if (isMyTurn && remaining <= 10 && remaining > 0) {
+                playTickSound();
+            }
+
             if (remaining <= 0 && isMyTurn) {
                 console.log("Timer expired.");
                 dispatch({ type: 'PASS_TURN' });
@@ -292,7 +304,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         updateTimer(); // Initial call
 
         return () => clearInterval(timer);
-    }, [state.turnDeadline, isMyTurn, dispatch]); // Added dispatch
+    }, [state.turnDeadline, isMyTurn, dispatch, playTickSound]);
 
     const totalSeconds = state.config.turnLimitSeconds;
     const percentage = Math.max(0, Math.min(1, timeLeft / totalSeconds));
@@ -311,9 +323,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const [showResults, setShowResults] = useState(true);
     const [toast, setToast] = useState<{ message: string, type: 'error' | 'info' } | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string, onConfirm: () => void } | null>(null);
-
-    // Sound Effects
-    const { playTokenSound, playRecruitSound, playReserveSound, playCardFlipSound, playErrorSound, playVictorySound, playTurnSound } = useSoundEffects();
 
 
     // Auto-clear toast
