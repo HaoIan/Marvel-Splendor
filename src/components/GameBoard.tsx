@@ -642,6 +642,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                             className="btn-primary"
                             disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
                             style={{
+                                marginTop: '2px',
                                 padding: '6px 12px',
                                 fontSize: '0.8rem',
                                 opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
@@ -662,6 +663,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                             }}
                         >
                             Reset
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                setConfirmModal({
+                                    message: "Pass your turn without taking any action?",
+                                    onConfirm: () => {
+                                        dispatch({ type: 'PASS_TURN' });
+                                    }
+                                });
+                            }}
+                            disabled={!isMyTurn}
+                            style={{
+                                background: 'red',
+                                border: 'none',
+                                color: 'white',
+                                padding: '4px',
+                                borderRadius: '4px',
+                                fontSize: '0.8rem',
+                                opacity: !isMyTurn ? 0.5 : 1,
+                                cursor: !isMyTurn ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            Pass
                         </button>
                     </div>
 

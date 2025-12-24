@@ -10,7 +10,8 @@ export type GameAction =
     | { type: 'SYNC_STATE'; state: GameState }
     | { type: 'PLAYER_JOINED'; player: Player }
     | { type: 'START_GAME'; players: { id: string; name: string; uuid?: string }[] }
-    | { type: 'RECONNECT_PLAYER'; oldId: string; newId: string };
+    | { type: 'RECONNECT_PLAYER'; oldId: string; newId: string }
+    | { type: 'PASS_TURN' };
 
 // Shuffle helper
 const shuffle = (array: any[]) => {
@@ -337,6 +338,15 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 players: newPlayers,
                 logs: [...state.logs, `${newPlayers[playerIndex].name} reconnected.`]
             };
+        }
+
+        case 'PASS_TURN': {
+            const player = state.players[state.currentPlayerIndex];
+            const newState = {
+                ...state,
+                logs: [...state.logs, `${player.name} passed their turn.`]
+            };
+            return processEndTurn(newState);
         }
 
         default:
