@@ -8,3 +8,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export const signInAnonymously = async () => {
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) {
+        console.error('Error signing in anonymously:', error);
+        return null;
+    }
+    return data.user?.id;
+};

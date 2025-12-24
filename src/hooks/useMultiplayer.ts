@@ -14,7 +14,8 @@ export interface MultiplayerState {
 
 export const useMultiplayer = (
     dispatch: (action: GameAction) => void,
-    gameState: GameState
+    gameState: GameState,
+    playerUUID?: string
 ) => {
     const [mpState, setMpState] = useState<MultiplayerState>({
         playerId: null,
@@ -32,17 +33,19 @@ export const useMultiplayer = (
 
     // Auto-reconnect based on storage
     useEffect(() => {
+        if (!playerUUID) return; // Wait for Auth
+
         const savedGameId = sessionStorage.getItem('splendor_gameId');
-        const savedPlayerId = sessionStorage.getItem('splendor_playerUUID');
+        // const savedPlayerId = sessionStorage.getItem('splendor_playerUUID'); // Deprecated, use Auth ID
         const savedIsHost = sessionStorage.getItem('splendor_isHost') === 'true';
         const savedName = sessionStorage.getItem('splendor_playerName');
 
-        if (savedGameId && savedPlayerId && savedName) {
+        if (savedGameId && savedName) {
             console.log("Restoring session:", savedGameId);
             // We reuse joinGame logic, but need to be careful not to create loop
-            joinGame(savedGameId, savedName, savedPlayerId, savedIsHost);
+            joinGame(savedGameId, savedName, playerUUID, savedIsHost);
         }
-    }, []);
+    }, [playerUUID]);
 
     // Cleanup subscription on unmount
     useEffect(() => {

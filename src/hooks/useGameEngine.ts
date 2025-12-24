@@ -3,7 +3,7 @@ import { gameReducer, createInitialState } from './gameReducer';
 import type { GameAction } from './gameReducer';
 import { useMultiplayer } from './useMultiplayer';
 
-export const useGameEngine = () => {
+export const useGameEngine = (playerUUID?: string) => {
     // Initial State override could happen here if we loaded from local storage
     const [state, dispatch] = useReducer(gameReducer, createInitialState([{ id: 'host', name: 'Player 1' }, { id: 'p2', name: 'Player 2' }]), (initial) => {
         const saved = sessionStorage.getItem('splendor_gameState');
@@ -23,7 +23,7 @@ export const useGameEngine = () => {
     }, [state]);
 
     // Custom dispatch wrapper to handle forwarding actions to Host if we are Client
-    const { mpState, hostGame, joinGame, sendAction, closeLobby } = useMultiplayer(dispatch, state);
+    const { mpState, hostGame, joinGame, sendAction, closeLobby } = useMultiplayer(dispatch, state, playerUUID);
 
     const matchDispatch = (action: GameAction) => {
         // If we are connected to a game, we always "Send" the action.

@@ -1,22 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { supabase, signInAnonymously } from './lib/supabase';
 import './App.css';
 import { useGameEngine } from './hooks/useGameEngine';
 import { GameBoard } from './components/GameBoard';
 
 function App() {
-  const { state, dispatch, mpState, hostGame, joinGame, closeLobby } = useGameEngine();
+  // Identity logic
+  const [playerUUID, setPlayerUUID] = useState('');
+  const initializingRef = useRef(false);
+
+  useEffect(() => {
+    if (initializingRef.current) return;
+    initializingRef.current = true;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        console.log("Existing session found:", session.user.id);
+        setPlayerUUID(session.user.id);
+      } else {
+        console.log("No session, signing in anonymously...");
+        signInAnonymously().then(id => {
+          console.log("Signed in anonymously with ID:", id);
+          if (id) setPlayerUUID(id);
+        });
+      }
+    });
+  }, []);
+
+  const { state, dispatch, mpState, hostGame, joinGame, closeLobby } = useGameEngine(playerUUID);
   const [remoteId, setRemoteId] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [isLocal, setIsLocal] = useState(false);
-
-  // Identity logic
-  const [playerUUID] = useState(() => {
-    const saved = sessionStorage.getItem('splendor_playerUUID');
-    if (saved) return saved;
-    const newId = crypto.randomUUID();
-    sessionStorage.setItem('splendor_playerUUID', newId);
-    return newId;
-  });
 
   const myPlayerId = isLocal ? null : mpState.playerId;
 
@@ -66,7 +80,9 @@ function App() {
                   />
                 </div>
 
-                {mpState.connectionStatus === 'idle' || mpState.connectionStatus === 'error' ? (
+                {!playerUUID ? (
+                  <div style={{ color: '#aaa' }}>Establishing secure connection...</div>
+                ) : mpState.connectionStatus === 'idle' || mpState.connectionStatus === 'error' ? (
                   <>
                     <button className="btn-primary" onClick={() => {
                       if (playerName.trim()) hostGame(playerName, playerUUID);
