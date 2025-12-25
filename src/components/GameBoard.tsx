@@ -337,18 +337,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const [timeLeft, setTimeLeft] = useState(0);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
-    // Track animated locations to prevent double-firing in Strict Mode
-    const animatedLocationIdRef = useRef<string | null>(null);
-
     // Auto-acquire single location with delay for animation
     useEffect(() => {
         if (state.pendingLocationSelection && state.pendingLocationSelection.length === 1) {
             const loc = state.pendingLocationSelection[0];
-
-            // If we already animated this location, skip
-            if (animatedLocationIdRef.current === loc.id) return;
-
-            animatedLocationIdRef.current = loc.id;
             const playerId = state.players[state.currentPlayerIndex].id;
 
             // 1. Trigger Animation (Visible to all) after card animation finishes (~700ms)
@@ -368,12 +360,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             return () => {
                 clearTimeout(animTimer);
                 if (dispatchTimer) clearTimeout(dispatchTimer);
-                // Note: We DO NOT reset animatedLocationIdRef here because we want to persist the "done" state
-                // until the location changes (which happens via pendingLocationSelection clearing)
             };
-        } else {
-            // Reset ref when no pending selection (cleanup)
-            animatedLocationIdRef.current = null;
         }
     }, [state.pendingLocationSelection, state.currentPlayerIndex, isMyTurn, dispatch, playRecruitSound]);
 
@@ -434,6 +421,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
     // Track previous market state to detect new cards
     const prevMarketRef = React.useRef(state.market);
+    const prevLocationsRef = React.useRef(state.locations || []);
 
     // Custom UI State
     const [showResults, setShowResults] = useState(true);
@@ -543,6 +531,33 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         prevMarketRef.current = state.market;
     }, [state.market]);
 
+    // Animate Locations entering the board (Start of Game)
+    React.useLayoutEffect(() => {
+        const currentLocations = state.locations || [];
+        const prevLocations = prevLocationsRef.current;
+
+        // Find new locations
+        const newLocations = currentLocations.filter(loc => !prevLocations.some(pl => pl.id === loc.id));
+
+        newLocations.forEach((loc, index) => {
+            const startId = 'deck-tier-3'; // Fly from top deck
+            const targetId = `location-tile-${loc.id}`;
+
+            // Hide real location
+            setHiddenCardIds(prev => new Set(prev).add(loc.id));
+
+            // Stagger animations
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    // Use card type for flying tile
+                    triggerAnimation('card', loc.image, startId, targetId, undefined, loc.id);
+                });
+            }, index * 200 + 500); // Initial delay + stagger
+        });
+
+        prevLocationsRef.current = currentLocations;
+    }, [state.locations]);
+
     const triggerAnimation = (type: 'token' | 'card', content: string, startId: string, endId: string, backContent?: string, relatedCardId?: string) => {
         const startEl = document.getElementById(startId);
         const endEl = document.getElementById(endId);
@@ -553,11 +568,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
         // Calculate a centered target rect to avoid expanding to the full container size
         // If animating to market (endId includes 'market-card'), use full size (120x168)
+        // If animating to location (endId includes 'location-tile'), use full size (130x130)
         // If token, use 35x35. Else (player area), use 60x84.
         const isMarketCard = endId.includes('market-card');
+        const isLocationTile = endId.includes('location-tile');
 
-        const targetWidth = type === 'token' ? 35 : (isMarketCard ? 120 : 60);
-        const targetHeight = type === 'token' ? 35 : (isMarketCard ? 168 : 84);
+        const targetWidth = type === 'token' ? 35 : (isMarketCard ? 120 : (isLocationTile ? 130 : 60));
+        const targetHeight = type === 'token' ? 35 : (isMarketCard ? 168 : (isLocationTile ? 130 : 84));
         const centerX = endRectRaw.left + endRectRaw.width / 2;
         const centerY = endRectRaw.top + endRectRaw.height / 2;
 
@@ -922,7 +939,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 <div className="locations-row" style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '20px' }}>
                     {(state.locations || []).map(loc => (
                         <div key={loc.id} id={`location-tile-${loc.id}`}>
-                            <LocationView location={loc} onClick={() => setSelectedLocation(loc)} />
+                            {hiddenCardIds.has(loc.id) ? (
+                                <div style={{ width: '130px', height: '130px' }}></div>
+                            ) : (
+                                <LocationView location={loc} onClick={() => setSelectedLocation(loc)} />
+                            )}
                         </div>
                     ))}
                     {(state.locations || []).length === 0 && (
@@ -954,8 +975,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                     }}>
                                     </div>
                                 ) : (
-                                    <div style={{ width: '120px', height: '168px', border: '1px dashed #333', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444' }}>
-                                        No Cards Remaining
+                                    <div style={{ width: '120px', height: '168px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     </div>
                                 )}
                             </div>
