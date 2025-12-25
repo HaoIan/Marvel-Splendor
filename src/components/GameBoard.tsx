@@ -137,7 +137,6 @@ const LocationView = ({ location, onClick, style, disabled, hideName }: { locati
         className={`card location ${disabled ? 'disabled' : ''}`} // Reuse 'card' class for hover effects and base styling
         onClick={onClick}
         style={{
-            ...style,
             width: '130px', // Match card width
             height: '130px', // Match card height
             backgroundImage: `url(${location.image})`,
@@ -149,7 +148,8 @@ const LocationView = ({ location, onClick, style, disabled, hideName }: { locati
             boxShadow: '0 0 10px rgba(0,0,0,0.5)',
             cursor: onClick ? 'pointer' : 'default',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            ...style
         }}
     >
         <div className="card-header">
@@ -421,7 +421,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
     // Track previous market state to detect new cards
     const prevMarketRef = React.useRef(state.market);
-    const prevLocationsRef = React.useRef(state.locations || []);
+    const prevLocationsRef = React.useRef<Location[]>([]);
 
     // Custom UI State
     const [showResults, setShowResults] = useState(true);
@@ -536,8 +536,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         const currentLocations = state.locations || [];
         const prevLocations = prevLocationsRef.current;
 
-        // Find new locations
-        const newLocations = currentLocations.filter(loc => !prevLocations.some(pl => pl.id === loc.id));
+        // Find new locations (Check ID AND Image to handle random seed mismatches/resyncs)
+        const newLocations = currentLocations.filter(loc =>
+            !prevLocations.some(pl => pl.id === loc.id && pl.image === loc.image)
+        );
 
         newLocations.forEach((loc, index) => {
             const startId = 'deck-tier-3'; // Fly from top deck
@@ -569,12 +571,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         // Calculate a centered target rect to avoid expanding to the full container size
         // If animating to market (endId includes 'market-card'), use full size (120x168)
         // If animating to location (endId includes 'location-tile'), use full size (130x130)
+        // If animating FROM location (startId includes 'location-tile'), use scaled down square (65x65)
         // If token, use 35x35. Else (player area), use 60x84.
         const isMarketCard = endId.includes('market-card');
-        const isLocationTile = endId.includes('location-tile');
+        const isLocationTarget = endId.includes('location-tile');
+        const isLocationSource = startId.includes('location-tile');
 
-        const targetWidth = type === 'token' ? 35 : (isMarketCard ? 120 : (isLocationTile ? 130 : 60));
-        const targetHeight = type === 'token' ? 35 : (isMarketCard ? 168 : (isLocationTile ? 130 : 84));
+        const targetWidth = type === 'token' ? 35 : (isMarketCard ? 120 : (isLocationTarget ? 130 : (isLocationSource ? 65 : 60)));
+        const targetHeight = type === 'token' ? 35 : (isMarketCard ? 168 : (isLocationTarget ? 130 : (isLocationSource ? 65 : 84)));
         const centerX = endRectRaw.left + endRectRaw.width / 2;
         const centerY = endRectRaw.top + endRectRaw.height / 2;
 
@@ -606,14 +610,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const handleAnimationComplete = (id: string) => {
         setAnimations(prev => {
             const completed = prev.find(a => a.id === id);
+            const remaining = prev.filter(a => a.id !== id);
+
             if (completed && completed.relatedCardId) {
-                setHiddenCardIds(current => {
-                    const next = new Set(current);
-                    next.delete(completed.relatedCardId!);
-                    return next;
-                });
+                // Only unhide if NO OTHER active animations rely on this card ID
+                // This prevents flickering if a new animation started (e.g. correction) before the old one finished
+                const isStillAnimating = remaining.some(a => a.relatedCardId === completed.relatedCardId);
+
+                if (!isStillAnimating) {
+                    setHiddenCardIds(current => {
+                        const next = new Set(current);
+                        next.delete(completed.relatedCardId!);
+                        return next;
+                    });
+                }
             }
-            return prev.filter(a => a.id !== id);
+            return remaining;
         });
     };
 
@@ -937,15 +949,35 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
                 {/* Locations */}
                 <div className="locations-row" style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '20px' }}>
-                    {(state.locations || []).map(loc => (
-                        <div key={loc.id} id={`location-tile-${loc.id}`}>
-                            {hiddenCardIds.has(loc.id) ? (
-                                <div style={{ width: '130px', height: '130px' }}></div>
-                            ) : (
-                                <LocationView location={loc} onClick={() => setSelectedLocation(loc)} />
-                            )}
-                        </div>
-                    ))}
+                    {(state.locations || []).map(loc => {
+                        const isPendingSelection = state.pendingLocationSelection?.some(l => l.id === loc.id) && isMyTurn;
+                        return (
+                            <div key={loc.id} id={`location-tile-${loc.id}`}>
+                                {hiddenCardIds.has(loc.id) ? (
+                                    <div style={{ width: '130px', height: '130px' }}></div>
+                                ) : (
+                                    <div style={{ position: 'relative' }}>
+                                        <LocationView
+                                            location={loc}
+                                            onClick={() => {
+                                                if (isPendingSelection) {
+                                                    dispatch({ type: 'SELECT_LOCATION', locationId: loc.id });
+                                                } else {
+                                                    setSelectedLocation(loc);
+                                                }
+                                            }}
+                                            style={isPendingSelection ? {
+                                                border: '4px solid gold',
+                                                animation: 'glow 2s infinite',
+                                                transform: 'scale(1.05)',
+                                                '--glow-color': 'gold'
+                                            } as React.CSSProperties : undefined}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                     {(state.locations || []).length === 0 && (
                         <div style={{ color: '#555', fontStyle: 'italic', padding: '20px' }}>No Locations Remaining</div>
                     )}
@@ -1154,33 +1186,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 </div>
             )}
 
-            {/* Location Selection Modal (Multiple Only) */}
+            {/* On-board Selection Banner */}
             {state.pendingLocationSelection && state.pendingLocationSelection.length > 1 && isMyTurn && (
                 <div style={{
-                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                    background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100
+                    position: 'fixed', top: '80px', left: '50%', transform: 'translateX(-50%)',
+                    background: 'rgba(0, 0, 0, 0.8)', border: '1px solid gold', borderRadius: '20px',
+                    padding: '10px 30px', color: 'gold', fontWeight: 'bold', fontSize: '1.2rem',
+                    boxShadow: '0 0 20px rgba(255, 215, 0, 0.3)', zIndex: 90
                 }}>
-                    <div className="glass-panel" style={{ textAlign: 'center', border: '2px solid gold', boxShadow: '0 0 50px gold' }}>
-                        <h2 style={{ color: 'gold' }}>Location Earned!</h2>
-                        <p>You have qualified for multiple locations. Choose one to claim:</p>
-                        <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', margin: '30px' }}>
-                            {state.pendingLocationSelection.map(loc => (
-                                <div key={loc.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                                    <LocationView
-                                        location={loc}
-                                        onClick={() => dispatch({ type: 'SELECT_LOCATION', locationId: loc.id })}
-                                        style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
-                                    />
-                                    <button
-                                        className="btn-primary"
-                                        onClick={() => dispatch({ type: 'SELECT_LOCATION', locationId: loc.id })}
-                                    >
-                                        Claim {loc.name}
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    Selection Required: Choose a location to claim
                 </div>
             )}
 
