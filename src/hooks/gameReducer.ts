@@ -1,6 +1,6 @@
-import type { GameState, Player, TokenBank, Card, Cost } from '../types';
+import type { GameState, Player, TokenBank, Card, Cost, Location } from '../types';
 import { INITIAL_DECK } from '../data/cards';
-
+import { LOCATION_TILES } from '../data/locations';
 
 export type GameAction =
     | { type: 'TAKE_TOKENS'; tokens: TokenBank }
@@ -11,7 +11,8 @@ export type GameAction =
     | { type: 'PLAYER_JOINED'; player: Player }
     | { type: 'START_GAME'; players: { id: string; name: string; uuid?: string }[]; config?: { turnLimitSeconds: number } }
     | { type: 'RECONNECT_PLAYER'; oldId: string; newId: string }
-    | { type: 'PASS_TURN' };
+    | { type: 'PASS_TURN' }
+    | { type: 'SELECT_LOCATION'; locationId: string };
 
 // Shuffle helper
 const shuffle = (array: any[]) => {
@@ -46,6 +47,7 @@ export const createInitialState = (
         hand: [],
         tableau: [],
         nobles: [],
+        locations: [],
         points: 0,
         isHuman: true
     }));
@@ -53,13 +55,25 @@ export const createInitialState = (
     // Standard setup: 2p->4, 3p->5, 4p->7
     const bankSize = playerConfig.length === 2 ? 4 : playerConfig.length === 3 ? 5 : 7;
 
+    // Location Setup
+    // Select N tiles based on player count (N = number of players)
+    // If fewer than 4 players, shuffle and pick N
+    const numPlayers = Math.max(2, Math.min(4, playerConfig.length)); // Clamp between 2 and 4
+    const selectedTiles = shuffle([...LOCATION_TILES]).slice(0, numPlayers);
+
+    // For each tile, randomly pick side A or side B
+    const locations: Location[] = selectedTiles.map((tile: any) => {
+        return Math.random() < 0.5 ? tile.sideA : tile.sideB;
+    });
+
     return {
         players,
         currentPlayerIndex: 0,
         tokens: { red: bankSize, blue: bankSize, yellow: bankSize, purple: bankSize, orange: bankSize, green: bankSize, gray: 5 },
         decks: { 1: deck1, 2: deck2, 3: deck3 },
         market,
-        nobles: [],
+        nobles: [], // Deprecated/Empty
+        locations,
         turn: 1,
         winner: null,
         logs: ['Game initialized.'],
@@ -354,23 +368,61 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             return processEndTurn(newState);
         }
 
+        case 'SELECT_LOCATION': {
+            const playerIndex = state.currentPlayerIndex;
+            let player = { ...state.players[playerIndex] };
+
+            // Verify pending
+            if (!state.pendingLocationSelection || state.pendingLocationSelection.length === 0) return state;
+
+            const selectedLoc = state.pendingLocationSelection.find(l => l.id === action.locationId);
+            if (!selectedLoc) return state;
+
+            // Award location
+            player.locations = [...player.locations, selectedLoc];
+            player.points += selectedLoc.points;
+
+            // Remove from available locations
+            const newLocations = state.locations.filter(l => l.id !== selectedLoc.id);
+
+            const newPlayers = [...state.players];
+            newPlayers[playerIndex] = player;
+
+            const stateAfterLocation = {
+                ...state,
+                players: newPlayers,
+                locations: newLocations,
+                pendingLocationSelection: undefined,
+                logs: [...state.logs, `${player.name} took location: ${selectedLoc.name}`]
+            };
+
+            return advanceTurn(stateAfterLocation);
+        }
+
         default:
             return state;
     }
 };
 
-const processEndTurn = (state: GameState): GameState => {
+// Renaming the old processEndTurn to advanceTurn and making it strictly about rotating players
+const advanceTurn = (state: GameState): GameState => {
+    // Check Win Condition Trigger: 16 Points + Green Stone + 1 Card of Each Color
     const player = state.players[state.currentPlayerIndex];
     let nextState = { ...state };
 
-    // Check Win Condition Trigger: 16 Points + Green Stone + 1 Card of Each Color
+    // Check Win Condition Trigger: 16 Points + Green Stone
     // If condition met, and not already in final round, trigger final round.
     if (!state.finalRound && player.points >= 16 && player.tokens.green > 0) {
-        // Check for all 5 colors logic
+        // Check for all 5 colors logic? (Matches original logic)
+        // Original logic checked for points/green, THEN checked colors for some reason?
+        // Wait, the original code had: "if (!state.finalRound && player.points >= 16 && player.tokens.green > 0) ... hasAllColors ..."
+        // I will preserving the exact original win condition logic.
         const playerColors = new Set(player.tableau.map(c => c.bonus));
         const requiredColors = ['red', 'blue', 'yellow', 'purple', 'orange'];
         const hasAllColors = requiredColors.every(color => playerColors.has(color as any));
 
+        // Note: The original generic win condition in Splendor is just 15/16 points. 
+        // Marvel Splendor specific: 16 points + Time Stone (Green) + 1 of each color bonus.
         if (hasAllColors) {
             nextState.finalRound = true;
             nextState.logs = [...nextState.logs, `${player.name} has triggered the end game! Finishing the round...`];
@@ -413,4 +465,65 @@ const processEndTurn = (state: GameState): GameState => {
         turn: nextIndex === 0 ? state.turn + 1 : state.turn,
         turnDeadline: state.config.turnLimitSeconds > 0 ? Date.now() + (state.config.turnLimitSeconds * 1000) : undefined
     };
+};
+
+const processEndTurn = (state: GameState): GameState => {
+    // 1. Check for Locations
+    // Requirements: Player bonuses (from tableau) >= Location requirements
+    // Limit: 1 per turn.
+    // If > 1 eligible, user must choose.
+
+    const playerIndex = state.currentPlayerIndex;
+    const player = state.players[playerIndex];
+
+    // Calculate Bonuses
+    const bonuses: Record<string, number> = { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0 };
+    player.tableau.forEach(c => {
+        if (c.bonus && bonuses[c.bonus] !== undefined) bonuses[c.bonus]++;
+    });
+
+    // Find Eligible Locations
+    const eligibleLocations = (state.locations || []).filter(loc => {
+        // Check if player meets all requirements
+        const reqs = loc.requirements;
+        return (Object.keys(reqs) as (keyof Cost)[]).every(r => {
+            const needed = reqs[r] || 0;
+            const has = bonuses[r] || 0;
+            return has >= needed;
+        });
+    });
+
+    if (eligibleLocations.length === 0) {
+        // No locations, standard end turn
+        return advanceTurn(state);
+    } else if (eligibleLocations.length === 1) {
+        // Exactly one, auto-take
+        const loc = eligibleLocations[0];
+
+        // Award location
+        const newPlayer = {
+            ...player,
+            locations: [...player.locations, loc],
+            points: player.points + loc.points
+        };
+        const newLocations = state.locations.filter(l => l.id !== loc.id);
+
+        const newPlayers = [...state.players];
+        newPlayers[playerIndex] = newPlayer;
+
+        const newState = {
+            ...state,
+            players: newPlayers,
+            locations: newLocations,
+            logs: [...state.logs, `${player.name} claimed ${loc.name} automatically.`]
+        };
+        return advanceTurn(newState);
+    } else {
+        // Multiple locations, must choose
+        return {
+            ...state,
+            pendingLocationSelection: eligibleLocations,
+            logs: [...state.logs, `${player.name} qualifies for multiple locations. Please choose one.`]
+        };
+    }
 };

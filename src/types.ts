@@ -38,6 +38,14 @@ export interface Noble {
   imageUrl?: string;
 }
 
+export interface Location {
+  id: string;
+  name: string;
+  points: number;
+  requirements: Cost;
+  image: string; // Path to asset
+}
+
 export interface Player {
   id: string;
   uuid?: string; // Stable ID for reconnection
@@ -46,6 +54,7 @@ export interface Player {
   hand: Card[]; // Reserved cards
   tableau: Card[]; // Recruited cards
   nobles: Noble[];
+  locations: Location[];
   points: number;
   isHuman: boolean;
 }
@@ -64,7 +73,9 @@ export interface GameState {
     2: Card[];
     3: Card[];
   };
-  nobles: Noble[];
+  nobles: Noble[]; // Keeping for backward compatibility if needed, but Locations replace 'nobles' mechanic here
+  locations: Location[];
+  pendingLocationSelection?: Location[]; // If a player qualifies for multiple locations
   turn: number;
   winner: string | null;
   logs: string[];

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { GameState, Card as CardType, TokenBank, Player, Cost } from '../types';
+import type { GameState, Card as CardType, TokenBank, Player, Cost, Location } from '../types';
 import type { GameAction } from '../hooks/gameReducer';
 import { AnimationOverlay, type AnimationItem } from './AnimationOverlay';
 import { useSoundEffects } from '../hooks/useSoundEffects'; // Import Sound Hook
@@ -132,7 +132,49 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: {
     );
 };
 
-const PlayerArea = ({ player, isActive, onCardClick, isMe }: { player: Player, isActive: boolean, onCardClick: (card: CardType) => void, isMe?: boolean }) => (
+const LocationView = ({ location, onClick, style, disabled }: { location: Location, onClick?: () => void, style?: React.CSSProperties, disabled?: boolean }) => (
+    <div
+        className={`card location ${disabled ? 'disabled' : ''}`} // Reuse 'card' class for hover effects and base styling
+        onClick={onClick}
+        style={{
+            ...style,
+            width: '150px', // Match card width
+            height: '150px', // Match card height
+            backgroundImage: `url(${location.image})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            borderRadius: '10px',
+            border: '1px solid white',
+            position: 'relative',
+            boxShadow: '0 0 10px rgba(0,0,0,0.5)',
+            cursor: onClick ? 'pointer' : 'default',
+            display: 'flex',
+            flexDirection: 'column'
+        }}
+    >
+        <div className="card-header">
+            <span className="card-points" style={{ textShadow: '0 0 5px gold, 0 1px 2px black', color: 'white' }}>{location.points}</span>
+        </div>
+
+        {/* Reusing card-cost class for consistent layout */}
+        <div className="card-cost" style={{ flexDirection: 'column-reverse' }}>
+            {Object.entries(location.requirements).map(([color, amt]) => (
+                <div key={color} className={`cost-bubble ${color}`}>{amt}</div>
+            ))}
+        </div>
+
+        <div style={{
+            position: 'absolute', bottom: '2px', right: '2px',
+            fontSize: '0.6rem', background: 'rgba(0,0,0,0.7)', padding: '1px 3px', borderRadius: '3px',
+            maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            textShadow: '0 1px 1px black', color: 'white'
+        }}>
+            {location.name}
+        </div>
+    </div>
+);
+
+const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe }: { player: Player, isActive: boolean, onCardClick: (card: CardType) => void, onLocationClick: (loc: Location) => void, isMe?: boolean }) => (
     <div id={`player-area-${player.id}`} className={`player-card ${isActive ? 'active-turn' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: '1rem', color: isActive ? 'var(--marvel-green)' : 'inherit', textShadow: isActive ? '0 0 10px var(--marvel-green)' : 'none' }}>
@@ -160,6 +202,20 @@ const PlayerArea = ({ player, isActive, onCardClick, isMe }: { player: Player, i
                     {player.hand.map(card => (
                         <div key={card.id} style={{ transform: 'scale(0.5)', transformOrigin: 'top left', width: '60px', height: '84px' }}>
                             <CardView card={card} onClick={() => onCardClick(card)} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {/* Acquired Locations */}
+        {player.locations.length > 0 && (
+            <div style={{ marginBottom: '5px' }}>
+                <div style={{ fontSize: '0.7rem', color: '#aaa', marginBottom: '2px' }}>Locations ({player.locations.length})</div>
+                <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
+                    {player.locations.map(loc => (
+                        <div key={loc.id} style={{ transform: 'scale(0.5)', transformOrigin: 'top left', width: '75px', height: '75px' }}>
+                            <LocationView location={loc} onClick={() => onLocationClick(loc)} />
                         </div>
                     ))}
                 </div>
@@ -277,6 +333,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
     // Timer Logic Lifted Up
     const [timeLeft, setTimeLeft] = useState(0);
+    const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
     useEffect(() => {
         if (!state.turnDeadline) return;
@@ -801,6 +858,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                     </div>
                 </div>
 
+                {/* Locations */}
+                <div className="locations-row" style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '20px' }}>
+                    {(state.locations || []).map(loc => (
+                        <LocationView key={loc.id} location={loc} onClick={() => setSelectedLocation(loc)} />
+                    ))}
+                    {(state.locations || []).length === 0 && (
+                        <div style={{ color: '#555', fontStyle: 'italic', padding: '20px' }}>No Locations Remaining</div>
+                    )}
+                </div>
+
                 {/* Market */}
                 <div className="market-grid">
                     {[3, 2, 1].map(tier => (
@@ -848,7 +915,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
             <div className="player-panel right">
                 {state.players.map((p) => (
-                    <PlayerArea key={p.id} player={p} isActive={state.players.indexOf(p) === state.currentPlayerIndex} onCardClick={handleCardClick} isMe={p.id === myPeerId} />
+                    <PlayerArea
+                        key={p.id}
+                        player={p}
+                        isActive={state.players.indexOf(p) === state.currentPlayerIndex}
+                        onCardClick={handleCardClick}
+                        onLocationClick={setSelectedLocation}
+                        isMe={p.id === myPeerId}
+                    />
                 ))}
             </div>
 
@@ -991,12 +1065,94 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                     </>
                                 );
                             })()}
-                            <button style={{ padding: '10px', background: 'transparent', border: '1px solid #666', color: 'white', borderRadius: '4px', cursor: 'pointer' }} onClick={() => setSelectedCard(null)}>Cancel</button>
+                            <button style={{ padding: '10px', background: 'transparent', border: '1px solid #666', color: 'white', borderRadius: '4px', cursor: 'pointer' }} onClick={() => setSelectedCard(null)}>Close</button>
                         </div>
                         <p style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '10px' }}>Recruit adds to Tableau. Reserve adds to Hand + 1 Shield.</p>
                     </div>
                 </div>
             )}
+
+            {/* Location Selection Modal */}
+            {state.pendingLocationSelection && state.pendingLocationSelection.length > 0 && isMyTurn && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                    background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100
+                }}>
+                    <div className="glass-panel" style={{ textAlign: 'center', border: '2px solid gold', boxShadow: '0 0 50px gold' }}>
+                        <h2 style={{ color: 'gold' }}>Location Earned!</h2>
+                        <p>You have qualified for multiple locations. Choose one to claim:</p>
+                        <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', margin: '30px' }}>
+                            {state.pendingLocationSelection.map(loc => (
+                                <div key={loc.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                    <LocationView
+                                        location={loc}
+                                        onClick={() => dispatch({ type: 'SELECT_LOCATION', locationId: loc.id })}
+                                        style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                                    />
+                                    <button
+                                        className="btn-primary"
+                                        onClick={() => dispatch({ type: 'SELECT_LOCATION', locationId: loc.id })}
+                                    >
+                                        Claim {loc.name}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Location Inspection Modal */}
+            {selectedLocation && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                    background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
+                }} onClick={() => setSelectedLocation(null)}>
+                    <div className="glass-panel" style={{ textAlign: 'center', border: '1px solid white', boxShadow: '0 0 30px white' }} onClick={e => e.stopPropagation()}>
+                        <h3>{selectedLocation.name}</h3>
+                        <div style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
+                            <div style={{ transform: 'scale(1.5)', margin: '30px' }}>
+                                <LocationView location={selectedLocation} disabled />
+                            </div>
+                        </div>
+                        <div style={{ marginBottom: '20px', color: '#ddd' }}>
+                            {(() => {
+                                const player = viewingPlayer;
+                                const bonuses: Record<string, number> = { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0 };
+                                player.tableau.forEach(c => {
+                                    if (c.bonus && bonuses[c.bonus] !== undefined) bonuses[c.bonus]++;
+                                });
+
+                                const missing: string[] = [];
+                                let qualificationsMet = true;
+
+                                (Object.keys(selectedLocation.requirements) as (keyof Cost)[]).forEach(color => {
+                                    const needed = selectedLocation.requirements[color] || 0;
+                                    const has = bonuses[color] || 0;
+                                    if (has < needed) {
+                                        qualificationsMet = false;
+                                        missing.push(`${needed - has} ${color.charAt(0).toUpperCase() + color.slice(1)}`);
+                                    }
+                                });
+
+                                if (qualificationsMet) {
+                                    return <span style={{ color: 'lime', fontWeight: 'bold' }}>You qualify for this location!</span>;
+                                } else {
+                                    return (
+                                        <span>
+                                            Missing Bonuses: <strong style={{ color: 'var(--marvel-red)' }}>{missing.join(', ')}</strong>
+                                        </span>
+                                    );
+                                }
+                            })()}
+                        </div>
+                        <button style={{ padding: '10px', background: 'transparent', border: '1px solid #666', color: 'white', borderRadius: '4px', cursor: 'pointer' }} onClick={() => setSelectedLocation(null)}>
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Victory Screen */}
             {state.status === 'GAME_OVER' && (
                 <>
