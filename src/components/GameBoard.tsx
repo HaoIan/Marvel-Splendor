@@ -132,14 +132,14 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: {
     );
 };
 
-const LocationView = ({ location, onClick, style, disabled }: { location: Location, onClick?: () => void, style?: React.CSSProperties, disabled?: boolean }) => (
+const LocationView = ({ location, onClick, style, disabled, hideName }: { location: Location, onClick?: () => void, style?: React.CSSProperties, disabled?: boolean, hideName?: boolean }) => (
     <div
         className={`card location ${disabled ? 'disabled' : ''}`} // Reuse 'card' class for hover effects and base styling
         onClick={onClick}
         style={{
             ...style,
-            width: '150px', // Match card width
-            height: '150px', // Match card height
+            width: '130px', // Match card width
+            height: '130px', // Match card height
             backgroundImage: `url(${location.image})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
@@ -159,18 +159,20 @@ const LocationView = ({ location, onClick, style, disabled }: { location: Locati
         {/* Reusing card-cost class for consistent layout */}
         <div className="card-cost" style={{ flexDirection: 'column-reverse' }}>
             {Object.entries(location.requirements).map(([color, amt]) => (
-                <div key={color} className={`cost-bubble ${color}`}>{amt}</div>
+                <div key={color} className={`cost-bubble ${color}`} style={{ borderRadius: '25%' }}>{amt}</div>
             ))}
         </div>
 
-        <div style={{
-            position: 'absolute', bottom: '2px', right: '2px',
-            fontSize: '0.6rem', background: 'rgba(0,0,0,0.7)', padding: '1px 3px', borderRadius: '3px',
-            maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            textShadow: '0 1px 1px black', color: 'white'
-        }}>
-            {location.name}
-        </div>
+        {!hideName && (
+            <div style={{
+                position: 'absolute', bottom: '2px', right: '2px',
+                fontSize: '0.6rem', background: 'rgba(0,0,0,0.7)', padding: '1px 3px', borderRadius: '3px',
+                maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                textShadow: '0 1px 1px black', color: 'white'
+            }}>
+                {location.name}
+            </div>
+        )}
     </div>
 );
 
@@ -334,6 +336,63 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     // Timer Logic Lifted Up
     const [timeLeft, setTimeLeft] = useState(0);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+
+    // Track animated locations to prevent double-firing in Strict Mode
+    const animatedLocationIdRef = useRef<string | null>(null);
+
+    // Auto-acquire single location with delay for animation
+    useEffect(() => {
+        if (state.pendingLocationSelection && state.pendingLocationSelection.length === 1) {
+            const loc = state.pendingLocationSelection[0];
+
+            // If we already animated this location, skip
+            if (animatedLocationIdRef.current === loc.id) return;
+
+            animatedLocationIdRef.current = loc.id;
+            const playerId = state.players[state.currentPlayerIndex].id;
+
+            // 1. Trigger Animation (Visible to all) after card animation finishes (~700ms)
+            const animTimer = setTimeout(() => {
+                triggerAnimation('card', loc.image, `location-tile-${loc.id}`, `player-area-${playerId}`);
+            }, 700);
+
+            // 2. Dispatch Action (Owner only) after flight (~800ms more)
+            let dispatchTimer: ReturnType<typeof setTimeout>;
+            if (isMyTurn) {
+                dispatchTimer = setTimeout(() => {
+                    dispatch({ type: 'SELECT_LOCATION', locationId: loc.id });
+                    playRecruitSound();
+                }, 1500);
+            }
+
+            return () => {
+                clearTimeout(animTimer);
+                if (dispatchTimer) clearTimeout(dispatchTimer);
+                // Note: We DO NOT reset animatedLocationIdRef here because we want to persist the "done" state
+                // until the location changes (which happens via pendingLocationSelection clearing)
+            };
+        } else {
+            // Reset ref when no pending selection (cleanup)
+            animatedLocationIdRef.current = null;
+        }
+    }, [state.pendingLocationSelection, state.currentPlayerIndex, isMyTurn, dispatch, playRecruitSound]);
+
+    // Toast Notification Logic
+    const [toastMsg, setToastMsg] = useState<{ msg: string, type: 'info' | 'error' | 'success' } | null>(null);
+    const prevLogLength = useRef(state.logs.length);
+
+    useEffect(() => {
+        if (state.logs.length > prevLogLength.current) {
+            const lastLog = state.logs[state.logs.length - 1];
+            // Check for location acquisition
+            if (lastLog.includes('took location')) {
+                setToastMsg({ msg: lastLog, type: 'success' });
+                const timer = setTimeout(() => setToastMsg(null), 4000);
+                return () => clearTimeout(timer);
+            }
+        }
+        prevLogLength.current = state.logs.length;
+    }, [state.logs]);
 
     useEffect(() => {
         if (!state.turnDeadline) return;
@@ -613,6 +672,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
         if (currentTotal + selectedCount > 10) {
             setToast({ message: `Cannot take tokens: You have ${currentTotal} and selected ${selectedCount}. Limit is 10.`, type: 'error' });
+            playErrorSound();
             return;
         }
 
@@ -861,7 +921,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 {/* Locations */}
                 <div className="locations-row" style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '20px' }}>
                     {(state.locations || []).map(loc => (
-                        <LocationView key={loc.id} location={loc} onClick={() => setSelectedLocation(loc)} />
+                        <div key={loc.id} id={`location-tile-${loc.id}`}>
+                            <LocationView location={loc} onClick={() => setSelectedLocation(loc)} />
+                        </div>
                     ))}
                     {(state.locations || []).length === 0 && (
                         <div style={{ color: '#555', fontStyle: 'italic', padding: '20px' }}>No Locations Remaining</div>
@@ -893,7 +955,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                     </div>
                                 ) : (
                                     <div style={{ width: '120px', height: '168px', border: '1px dashed #333', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444' }}>
-                                        Empty
+                                        No Cards Remaining
                                     </div>
                                 )}
                             </div>
@@ -1072,8 +1134,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 </div>
             )}
 
-            {/* Location Selection Modal */}
-            {state.pendingLocationSelection && state.pendingLocationSelection.length > 0 && isMyTurn && (
+            {/* Location Selection Modal (Multiple Only) */}
+            {state.pendingLocationSelection && state.pendingLocationSelection.length > 1 && isMyTurn && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
                     background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100
@@ -1112,7 +1174,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         <h3>{selectedLocation.name}</h3>
                         <div style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
                             <div style={{ transform: 'scale(1.5)', margin: '30px' }}>
-                                <LocationView location={selectedLocation} disabled />
+                                <LocationView location={selectedLocation} disabled hideName />
                             </div>
                         </div>
                         <div style={{ marginBottom: '20px', color: '#ddd' }}>
@@ -1140,7 +1202,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                 } else {
                                     return (
                                         <span>
-                                            Missing Bonuses: <strong style={{ color: 'var(--marvel-red)' }}>{missing.join(', ')}</strong>
+                                            Missing: <strong style={{ color: 'var(--marvel-red)' }}>{missing.join(', ')}</strong>
                                         </span>
                                     );
                                 }
@@ -1149,6 +1211,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         <button style={{ padding: '10px', background: 'transparent', border: '1px solid #666', color: 'white', borderRadius: '4px', cursor: 'pointer' }} onClick={() => setSelectedLocation(null)}>
                             Close
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Global Toast Notification */}
+            {toastMsg && (
+                <div className={`toast-notification ${toastMsg.type === 'success' ? 'info' : toastMsg.type}`}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {toastMsg.msg}
                     </div>
                 </div>
             )}

@@ -496,34 +496,13 @@ const processEndTurn = (state: GameState): GameState => {
     if (eligibleLocations.length === 0) {
         // No locations, standard end turn
         return advanceTurn(state);
-    } else if (eligibleLocations.length === 1) {
-        // Exactly one, auto-take
-        const loc = eligibleLocations[0];
-
-        // Award location
-        const newPlayer = {
-            ...player,
-            locations: [...player.locations, loc],
-            points: player.points + loc.points
-        };
-        const newLocations = state.locations.filter(l => l.id !== loc.id);
-
-        const newPlayers = [...state.players];
-        newPlayers[playerIndex] = newPlayer;
-
-        const newState = {
-            ...state,
-            players: newPlayers,
-            locations: newLocations,
-            logs: [...state.logs, `${player.name} claimed ${loc.name} automatically.`]
-        };
-        return advanceTurn(newState);
     } else {
-        // Multiple locations, must choose
+        // If 1 or more eligible, set pending selection.
+        // Even for 1, we pause to allow UI to animate, then UI will auto-dispatch.
         return {
             ...state,
             pendingLocationSelection: eligibleLocations,
-            logs: [...state.logs, `${player.name} qualifies for multiple locations. Please choose one.`]
+            logs: [...state.logs, `${player.name} qualifies for ${eligibleLocations.length} location(s).`]
         };
     }
 };
