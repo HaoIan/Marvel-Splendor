@@ -566,21 +566,46 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         if (!startEl || !endEl) return;
 
         const startRect = startEl.getBoundingClientRect();
-        const endRectRaw = endEl.getBoundingClientRect();
+
 
         // Calculate a centered target rect to avoid expanding to the full container size
         // If animating to market (endId includes 'market-card'), use full size (120x168)
         // If animating to location (endId includes 'location-tile'), use full size (130x130)
         // If animating FROM location (startId includes 'location-tile'), use scaled down square (65x65)
         // If token, use 35x35. Else (player area), use 60x84.
-        const isMarketCard = endId.includes('market-card');
-        const isLocationTarget = endId.includes('location-tile');
-        const isLocationSource = startId.includes('location-tile');
 
-        const targetWidth = type === 'token' ? 35 : (isMarketCard ? 120 : (isLocationTarget ? 130 : (isLocationSource ? 65 : 60)));
-        const targetHeight = type === 'token' ? 35 : (isMarketCard ? 168 : (isLocationTarget ? 130 : (isLocationSource ? 65 : 84)));
-        const centerX = endRectRaw.left + endRectRaw.width / 2;
-        const centerY = endRectRaw.top + endRectRaw.height / 2;
+        // Dynamically measure target size if possible to respect CSS transforms (e.g. mobile scaling)
+        let realEndEl = endEl;
+        // Check for specific inner elements that dictate the visual size
+        if (endId.includes('market-card') || endId.includes('location-tile')) {
+            const inner = endEl.querySelector('.card');
+            if (inner) realEndEl = inner as HTMLElement;
+        }
+
+        const rect = realEndEl.getBoundingClientRect();
+
+        let targetWidth: number;
+        let targetHeight: number;
+
+        if (endId.includes('player-area')) {
+            // Special case: Player Area = generic target. Use fixed mini size.
+            // Maintain logic: From Location -> 65x65 (Square), From Market -> 60x84 (Card)
+            const isLocationSource = startId.includes('location-tile');
+            targetWidth = isLocationSource ? 65 : 60;
+            targetHeight = isLocationSource ? 65 : 84;
+        } else if (endId.includes('token-bank')) {
+            // Token bank should match the element size
+            targetWidth = rect.width;
+            targetHeight = rect.height;
+        } else {
+            // Default: Trust the element's size (Market cards, Locations, Decks)
+            // This picks up the scale(0.85) on mobile automatically
+            targetWidth = rect.width;
+            targetHeight = rect.height;
+        }
+
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
 
         const endRect = {
             left: centerX - targetWidth / 2,
@@ -929,7 +954,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         </button>
                     </div>
 
-                    <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+                    <div className="token-bank-container" style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
                         {(['red', 'blue', 'yellow', 'purple', 'orange', 'gray', 'green'] as const).map(c => (
                             <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', margin: '-15px -10px' }}>
                                 <Token color={c} count={state.tokens[c]} onClick={() => handleTakeToken(c)} />
@@ -954,7 +979,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         return (
                             <div key={loc.id} id={`location-tile-${loc.id}`}>
                                 {hiddenCardIds.has(loc.id) ? (
-                                    <div style={{ width: '130px', height: '130px' }}></div>
+                                    <div className="card location" style={{ width: '130px', height: '130px', visibility: 'hidden' }}></div>
                                 ) : (
                                     <div style={{ position: 'relative' }}>
                                         <LocationView
@@ -989,7 +1014,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         <div key={tier} className="card-row" style={{ justifyContent: 'flex-start' }}>
                             {/* Deck Count & Back */}
                             <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-                                <div style={{
+                                <div className="deck-count" style={{
                                     display: 'flex', flexDirection: 'column', alignItems: 'center',
                                     color: '#aaa', fontSize: '0.8rem', width: '40px',
                                     position: 'absolute', right: '100%', marginRight: '10px'
@@ -1016,7 +1041,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                             {state.market[tier as 1 | 2 | 3].map(card => (
                                 <div key={card.id} id={`market-card-${card.id}`}>
                                     {hiddenCardIds.has(card.id) ? (
-                                        <div style={{ width: '120px', height: '168px' }}></div> // Transparent placeholder
+                                        <div className="card" style={{ width: '120px', height: '168px', visibility: 'hidden' }}></div> // Transparent placeholder
                                     ) : (
                                         <CardView card={card} onClick={() => handleCardClick(card)} canAfford={canAfford(card)} noAnimate={justArrivedIdsRef.current.has(card.id)} />
                                     )}

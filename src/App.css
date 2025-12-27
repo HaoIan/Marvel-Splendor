@@ -499,6 +499,177 @@ body {
   background: rgba(255, 50, 50, 0.95);
 }
 
+
 .toast-notification.info {
   background: rgba(50, 50, 50, 0.95);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .game-layout {
+    display: flex;
+    flex-direction: column;
+    padding: 4.5rem 0.5rem 0.5rem 0.5rem;
+    /* Increased top padding to clear timer */
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .board-center {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+    padding: 0;
+  }
+
+  .player-panel.right {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: 25vh;
+    /* Limit player panel height */
+    width: 100%;
+    flex-direction: row;
+    /* Horizontal players? */
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 5px;
+    border-top: 1px solid #444;
+  }
+
+  /* If player panel is row, we might need to adjust player-card width */
+  .player-panel.right .player-card {
+    min-width: 250px;
+    width: 250px;
+  }
+
+  .market-grid {
+    padding: 10px 5px 10px 5px;
+    /* Reduced left padding */
+    gap: 0.5rem;
+    padding-top: 5px !important;
+    gap: 0 !important;
+  }
+
+  .card-row {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 5px;
+    /* Ensure scrollbar is visible if needed */
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+  }
+
+  /* Make deck count flow naturally */
+  .deck-count {
+    position: static !important;
+    margin-right: 5px !important;
+  }
+
+  /* Reset excess margin since deck count is now in flow */
+  .market-grid .card-row>div:first-child {
+    margin-right: 15px;
+    /* Slight gap between deck block and first card */
+  }
+
+  .locations-row {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Prevent vertical scrollbar */
+    padding-top: 5px;
+    justify-content: flex-start !important;
+    /* Override inline style */
+    padding-left: 10px;
+    margin-bottom: 0px !important;
+    /* Reduced from 20px */
+    min-height: 115px;
+    /* Reduced from 140px to fit scaled 130px*0.85 = 110.5px card */
+  }
+
+  .locations-row>div {
+    flex-shrink: 0;
+    margin-right: -10px;
+    /* Compensate for negative margin of cards to keep them close but not overlapping? No, let's just let them space naturally or tight */
+  }
+
+  /* Scale down cards slightly */
+  .card {
+    transform: scale(0.85);
+    margin: -10px;
+    /*Compensate for scale spacing*/
+    transform-origin: center center;
+  }
+
+  /* Reset margins for specific containers if needed */
+  .market-grid .card {
+    margin: -12px;
+  }
+
+  /* Handle deck count positioning with the scaling */
+  .market-grid .card-row>div:first-child {
+    margin-right: 20px;
+  }
+
+  /* Token Bank Container adjustments */
+  .board-center>div:first-child {
+    padding-left: 0 !important;
+    flex-direction: column !important;
+    gap: 15px !important;
+    margin-top: 10px !important;
+  }
+
+  .board-center>div:first-child>div:first-child {
+    /* The buttons container */
+    flex-direction: row !important;
+    margin-right: 0 !important;
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Token Bank Specifics */
+  .token-bank-container {
+    width: 100%;
+    overflow-x: auto;
+    /* Enable scroll if they don't fit */
+    justify-content: flex-start !important;
+    /* Start from left */
+    padding: 10px 0 20px 20px;
+    /* Padding for scrollbar and centering offset */
+    margin-left: -10px;
+    /* Slight pull back to center visual */
+  }
+
+  .token-bank-container>div {
+    transform: scale(0.7);
+    /* Scale down tokens */
+    margin: -25px -18px !important;
+    /* Tighten spacing significantly */
+    /* 
+        Original width 100px.
+        Scale 0.7 -> 70px visual.
+        Side margin -18px -> -36px total -> 64px layout width.
+        7 tokens * 64px = 448px. 
+        Still might overflow on 360px screen, but scroll handles it.
+     */
+    flex-shrink: 0;
+  }
+
+  /* Reduce scrollbar height for mobile horizontal scrolling */
+  .locations-row::-webkit-scrollbar,
+  .card-row::-webkit-scrollbar,
+  .token-bank-container::-webkit-scrollbar,
+  .player-panel.right::-webkit-scrollbar {
+    height: 4px;
+    /* Default is usually 8px or system default */
+  }
+
+  /* Optional: Adjust handle to be subtle */
+  .locations-row::-webkit-scrollbar-thumb,
+  .card-row::-webkit-scrollbar-thumb,
+  .token-bank-container::-webkit-scrollbar-thumb,
+  .player-panel.right::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+  }
 }

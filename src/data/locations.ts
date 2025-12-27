@@ -1,5 +1,3 @@
-import type { Location } from '../types';
-
 // Asset imports
 import asgardImg from '../assets/locations/asgard.jpg';
 import atlantisImg from '../assets/locations/atlantis.jpg';
