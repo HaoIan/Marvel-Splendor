@@ -908,112 +908,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
 
             <div className="board-center">
-                {/* Actions & Bank - Pinned Header */}
-                <div className="sticky-action-bar" style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    width: '100%',
-                    marginBottom: '15px',
-                    marginTop: '-10px',
-                    padding: '10px 0 10px 50px', // Adjusted padding
-                    boxSizing: 'border-box',
-                    zIndex: 50,
-                    // Sticky styles handled in CSS class for better media query support, 
-                    // but we can add inline defaults or let CSS handle it.
-                    // Let's rely on class for the sticky part to handle mobile specifically if needed.
-                }}>
 
-                    {/* Buttons - Static Positioned Left */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginRight: '20px' }}>
-                        <button
-                            onClick={confirmTakeTokens}
-                            className="btn-primary"
-                            disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
-                            style={{
-                                marginTop: '2px',
-                                padding: '6px 12px',
-                                fontSize: '0.8rem',
-                                opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
-                                cursor: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 'not-allowed' : 'pointer',
-                                transition: 'opacity 0.2s'
-                            }}
-                        >
-                            Confirm
-                        </button>
-                        <button
-                            onClick={() => setSelectedTokens({})}
-                            disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
-                            style={{
-                                background: '#444', border: 'none', color: 'white', padding: '4px', borderRadius: '4px', fontSize: '0.8rem',
-                                opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
-                                cursor: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 'not-allowed' : 'pointer',
-                                transition: 'opacity 0.2s'
-                            }}
-                        >
-                            Reset
-                        </button>
-
-                        <button
-                            onClick={() => {
-                                setConfirmModal({
-                                    message: "Pass your turn without taking any action?",
-                                    onConfirm: () => {
-                                        dispatch({ type: 'PASS_TURN' });
-                                    }
-                                });
-                            }}
-                            disabled={!isMyTurn}
-                            style={{
-                                background: 'red',
-                                border: 'none',
-                                color: 'white',
-                                padding: '4px',
-                                borderRadius: '4px',
-                                fontSize: '0.8rem',
-                                opacity: !isMyTurn ? 0.5 : 1,
-                                cursor: !isMyTurn ? 'not-allowed' : 'pointer'
-                            }}
-                        >
-                            Pass
-                        </button>
-
-                        {/* Player Toggle Button (Mobile) */}
-                        <button
-                            onClick={() => setShowPlayers(!showPlayers)}
-                            className="mobile-only-btn" // We'll add this class to hide on desktop if desired, or just show always
-                            style={{
-                                background: showPlayers ? 'var(--marvel-blue)' : '#444',
-                                border: 'none',
-                                color: 'white',
-                                padding: '4px',
-                                borderRadius: '4px',
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                                marginTop: '5px'
-                            }}
-                        >
-                            {showPlayers ? 'Hide Players' : 'Show Players'}
-                        </button>
-                    </div>
-
-                    <div className="token-bank-container" style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
-                        {(['red', 'blue', 'yellow', 'purple', 'orange', 'gray', 'green'] as const).map(c => (
-                            <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', margin: '-15px -10px' }}>
-                                <Token color={c} count={state.tokens[c]} onClick={() => handleTakeToken(c)} />
-                                {selectedTokens[c as keyof TokenBank] ? (
-                                    <span style={{
-                                        position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%)',
-                                        color: 'lime', fontWeight: 'bold', textShadow: '0 0 4px black, 0 0 2px black',
-                                        fontSize: '1.2rem', zIndex: 10, pointerEvents: 'none'
-                                    }}>
-                                        +{selectedTokens[c as keyof TokenBank]}
-                                    </span>
-                                ) : null}
-                            </div>
-                        ))}
-                    </div>
-                </div>
 
                 {/* Locations */}
                 <div className="locations-row" style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '20px' }}>
@@ -1095,20 +990,123 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 </div>
             </div>
 
-            <div className={`player-panel right ${!showPlayers ? 'hidden-mobile' : ''}`}>
-                {state.players.map((p) => (
-                    <PlayerArea
-                        key={p.id}
-                        player={p}
-                        isActive={state.players.indexOf(p) === state.currentPlayerIndex}
-                        onCardClick={handleCardClick}
-                        onLocationClick={setSelectedLocation}
-                        isMe={p.id === myPeerId}
-                    />
-                ))}
+            <div className={`player-panel right`}>
+                {/* Controls Section (Top on Desktop, Bottom on Mobile via flex-direction) */}
+                <div className="game-controls-section" style={{
+                    display: 'flex',
+                    flexDirection: 'column', // Stack vertically in right panel
+                    gap: '10px',
+                    padding: '10px',
+                    background: 'rgba(0,0,0,0.3)',
+                    borderRadius: '8px',
+                    marginBottom: '10px',
+                    alignItems: 'center'
+                }}>
+                    <div style={{ display: 'flex', gap: '5px', width: '100%', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <button
+                            onClick={confirmTakeTokens}
+                            className="btn-primary"
+                            disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
+                            style={{
+                                flex: '1 1 auto',
+                                padding: '8px',
+                                fontSize: '0.9rem',
+                                opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
+                                cursor: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 'not-allowed' : 'pointer',
+                            }}
+                        >
+                            Confirm
+                        </button>
+                        <button
+                            onClick={() => setSelectedTokens({})}
+                            disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
+                            style={{
+                                flex: '1 1 auto',
+                                background: '#444', border: 'none', color: 'white', padding: '8px', borderRadius: '4px', fontSize: '0.9rem',
+                                opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
+                                cursor: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 'not-allowed' : 'pointer',
+                            }}
+                        >
+                            Reset
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                setConfirmModal({
+                                    message: "Pass your turn without taking any action?",
+                                    onConfirm: () => {
+                                        dispatch({ type: 'PASS_TURN' });
+                                    }
+                                });
+                            }}
+                            disabled={!isMyTurn}
+                            style={{
+                                flex: '1 1 auto',
+                                background: 'red', border: 'none', color: 'white', padding: '8px', borderRadius: '4px', fontSize: '0.9rem',
+                                opacity: !isMyTurn ? 0.5 : 1,
+                                cursor: !isMyTurn ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            Pass
+                        </button>
+                    </div>
+
+                    {/* Token Bank - Compact for Side Panel */}
+                    <div className="token-bank-container" style={{ position: 'relative', display: 'flex', justifyContent: 'center', gap: '5px' }}>
+                        {(['red', 'blue', 'yellow', 'purple', 'orange', 'gray', 'green'] as const).map(c => (
+                            <div key={c} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                                <Token color={c} count={state.tokens[c]} onClick={() => handleTakeToken(c)} size={80} />
+                                {selectedTokens[c as keyof TokenBank] ? (
+                                    <span style={{
+                                        position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%)',
+                                        color: 'lime', fontWeight: 'bold', textShadow: '0 0 4px black, 0 0 2px black',
+                                        fontSize: '1rem', zIndex: 10, pointerEvents: 'none'
+                                    }}>
+                                        +{selectedTokens[c as keyof TokenBank]}
+                                    </span>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className={`player-list-section ${!showPlayers ? 'hidden-mobile' : ''}`} style={{ flex: 1, overflowY: 'auto' }}>
+                    {state.players.map((p) => (
+                        <PlayerArea
+                            key={p.id}
+                            player={p}
+                            isActive={state.players.indexOf(p) === state.currentPlayerIndex}
+                            onCardClick={handleCardClick}
+                            onLocationClick={setSelectedLocation}
+                            isMe={p.id === myPeerId}
+                        />
+                    ))}
+                </div>
+
+                {/* Arrow Toggle for Mobile */}
+                <button
+                    className="panel-toggle-btn mobile-only-btn"
+                    onClick={() => setShowPlayers(!showPlayers)}
+                    style={{
+                        background: 'transparent',
+                        color: 'var(--marvel-blue)',
+                        width: '30px', // Reduced width
+                        height: '25px',
+                        borderRadius: '10px 10px 0 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        fontSize: '1.2rem',
+                        alignSelf: 'center', // Center horizontally
+                        zIndex: 101, // Above everything
+                        marginBottom: '-1px', // Connect to panel
+                        padding: '0' // Ensure no extra padding
+                    }}
+                >
+                    {showPlayers ? '▼' : '▲'}
+                </button>
             </div>
-
-
 
             {/* Modal */}
             {selectedCard && (
