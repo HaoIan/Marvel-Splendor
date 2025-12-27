@@ -13,6 +13,10 @@
   --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
 }
 
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -247,10 +251,12 @@ body {
   background-position: center;
 }
 
-.card:not(.disabled):hover {
-  z-index: 10;
-  transform: scale(1.1);
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+@media (hover: hover) {
+  .card:not(.disabled):hover {
+    z-index: 10;
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+  }
 }
 
 .card.disabled {
@@ -669,7 +675,39 @@ body {
   .card-row::-webkit-scrollbar-thumb,
   .token-bank-container::-webkit-scrollbar-thumb,
   .player-panel.right::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
     border-radius: 4px;
+  }
+
+  .sticky-action-bar {
+    position: sticky;
+    top: 0;
+    backdrop-filter: blur(10px);
+    background: rgba(10, 11, 20, 0.85);
+    /* Matches panel bg */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    margin: -10px -10px 10px -10px !important;
+    /* Counteract padding of parent to stretch full width */
+    padding: 10px 10px 10px 60px !important;
+    /* Restore padding but keep left space for buttons */
+    width: calc(100% + 20px) !important;
+  }
+
+  /* When hidden-mobile is active, hide the panel */
+  .player-panel.right.hidden-mobile {
+    display: none !important;
+  }
+
+  /* Show toggle button only on mobile? Or let it be handled by inline styles? */
+  /* Actually GameBoard has mobile-only-btn class, let's define it generally or just assume inline is fine for logic.
+     But we want to hide it on desktop if the user implied it's redundant there.
+     However, standard play might benefit. Let's hide it on desktop to be safe.
+  */
+}
+
+/* Desktop styles for mobile-only-btn */
+@media (min-width: 769px) {
+  .mobile-only-btn {
+    display: none !important;
   }
 }

@@ -288,7 +288,12 @@ const GameTimer = ({
 
     return (
         <div style={styles}>
-            <span>{isMyTurn ? "Your Turn" : `${playerName}'s Turn`}</span>
+            <span>
+                {isMyTurn
+                    ? "Your Turn"
+                    : `${playerName.length > 12 ? playerName.slice(0, 12) + '...' : playerName}'s Turn`
+                }
+            </span>
             <span style={{
                 fontFamily: 'monospace',
                 fontSize: '1.2rem',
@@ -345,6 +350,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
             // 1. Trigger Animation (Visible to all) after card animation finishes (~700ms)
             const animTimer = setTimeout(() => {
+                setHiddenCardIds(prev => new Set(prev).add(loc.id));
                 triggerAnimation('card', loc.image, `location-tile-${loc.id}`, `player-area-${playerId}`);
             }, 700);
 
@@ -374,12 +380,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             // Check for location acquisition
             if (lastLog.includes('took location')) {
                 setToastMsg({ msg: lastLog, type: 'success' });
-                const timer = setTimeout(() => setToastMsg(null), 4000);
-                return () => clearTimeout(timer);
             }
         }
         prevLogLength.current = state.logs.length;
     }, [state.logs]);
+
+    // Auto-clear toastMsg
+    useEffect(() => {
+        if (toastMsg) {
+            const timer = setTimeout(() => setToastMsg(null), 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [toastMsg]);
 
     useEffect(() => {
         if (!state.turnDeadline) return;
@@ -428,6 +440,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const [toast, setToast] = useState<{ message: string, type: 'error' | 'info' } | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string, onConfirm: () => void } | null>(null);
 
+    const [showPlayers, setShowPlayers] = useState(true);
 
     // Auto-clear toast
     useEffect(() => {
@@ -895,9 +908,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
 
             <div className="board-center">
-                {/* Bank */}
-                {/* Bank */}
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', marginBottom: '15px', marginTop: '-10px', paddingLeft: '50px', boxSizing: 'border-box' }}>
+                {/* Actions & Bank - Pinned Header */}
+                <div className="sticky-action-bar" style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: '100%',
+                    marginBottom: '15px',
+                    marginTop: '-10px',
+                    padding: '10px 0 10px 50px', // Adjusted padding
+                    boxSizing: 'border-box',
+                    zIndex: 50,
+                    // Sticky styles handled in CSS class for better media query support, 
+                    // but we can add inline defaults or let CSS handle it.
+                    // Let's rely on class for the sticky part to handle mobile specifically if needed.
+                }}>
 
                     {/* Buttons - Static Positioned Left */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginRight: '20px' }}>
@@ -951,6 +976,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                             }}
                         >
                             Pass
+                        </button>
+
+                        {/* Player Toggle Button (Mobile) */}
+                        <button
+                            onClick={() => setShowPlayers(!showPlayers)}
+                            className="mobile-only-btn" // We'll add this class to hide on desktop if desired, or just show always
+                            style={{
+                                background: showPlayers ? 'var(--marvel-blue)' : '#444',
+                                border: 'none',
+                                color: 'white',
+                                padding: '4px',
+                                borderRadius: '4px',
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                                marginTop: '5px'
+                            }}
+                        >
+                            {showPlayers ? 'Hide Players' : 'Show Players'}
                         </button>
                     </div>
 
@@ -1052,7 +1095,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 </div>
             </div>
 
-            <div className="player-panel right">
+            <div className={`player-panel right ${!showPlayers ? 'hidden-mobile' : ''}`}>
                 {state.players.map((p) => (
                     <PlayerArea
                         key={p.id}
