@@ -35,10 +35,10 @@ export const useMultiplayer = (
     useEffect(() => {
         if (!playerUUID) return; // Wait for Auth
 
-        const savedGameId = sessionStorage.getItem('splendor_gameId');
-        // const savedPlayerId = sessionStorage.getItem('splendor_playerUUID'); // Deprecated, use Auth ID
-        const savedIsHost = sessionStorage.getItem('splendor_isHost') === 'true';
-        const savedName = sessionStorage.getItem('splendor_playerName');
+        const savedGameId = localStorage.getItem('splendor_gameId');
+        // const savedPlayerId = localStorage.getItem('splendor_playerUUID'); // Deprecated, use Auth ID
+        const savedIsHost = localStorage.getItem('splendor_isHost') === 'true';
+        const savedName = localStorage.getItem('splendor_playerName');
 
         if (savedGameId && savedName) {
             console.log("Restoring session:", savedGameId);
@@ -99,7 +99,7 @@ export const useMultiplayer = (
 
         if (error || !data) {
             setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game not found' }));
-            sessionStorage.removeItem('splendor_gameId'); // Clear invalid
+            localStorage.removeItem('splendor_gameId'); // Clear invalid
             return;
         }
 
@@ -108,7 +108,7 @@ export const useMultiplayer = (
         // Check if aborted
         if (syncedState.status === 'ABORTED') {
             setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game was aborted by host.' }));
-            sessionStorage.removeItem('splendor_gameId');
+            localStorage.removeItem('splendor_gameId');
             return;
         }
 
@@ -145,8 +145,8 @@ export const useMultiplayer = (
 
                 if (newState.status === 'ABORTED') {
                     alert("The Host has ended the game.");
-                    sessionStorage.removeItem('splendor_gameId');
-                    sessionStorage.removeItem('splendor_isHost');
+                    localStorage.removeItem('splendor_gameId');
+                    localStorage.removeItem('splendor_isHost');
                     window.location.reload();
                     return;
                 }
@@ -173,8 +173,8 @@ export const useMultiplayer = (
                 const remoteState = data.game_state as GameState;
                 if (remoteState.status === 'ABORTED') {
                     alert("The Host has ended the game.");
-                    sessionStorage.removeItem('splendor_gameId');
-                    sessionStorage.removeItem('splendor_isHost');
+                    localStorage.removeItem('splendor_gameId');
+                    localStorage.removeItem('splendor_isHost');
                     window.location.reload();
                 } else {
                     dispatch({ type: 'SYNC_STATE', state: remoteState });
@@ -186,9 +186,9 @@ export const useMultiplayer = (
         pollingRef.current = interval;
 
         // Save session
-        sessionStorage.setItem('splendor_gameId', gameId);
-        sessionStorage.setItem('splendor_isHost', String(isCreator));
-        sessionStorage.setItem('splendor_playerName', playerName);
+        localStorage.setItem('splendor_gameId', gameId);
+        localStorage.setItem('splendor_isHost', String(isCreator));
+        localStorage.setItem('splendor_playerName', playerName);
 
         setMpState({
             playerId: playerUUID,
@@ -233,8 +233,8 @@ export const useMultiplayer = (
 
         // Clear local and reload
         setMpState({ playerId: null, gameId: null, connectionStatus: 'idle', isHost: false });
-        sessionStorage.removeItem('splendor_gameId');
-        sessionStorage.removeItem('splendor_isHost');
+        localStorage.removeItem('splendor_gameId');
+        localStorage.removeItem('splendor_isHost');
         window.location.reload();
     };
 
