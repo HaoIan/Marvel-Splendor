@@ -11,7 +11,7 @@ export type GameAction =
     | { type: 'PLAYER_JOINED'; player: Player }
     | { type: 'START_GAME'; players: { id: string; name: string; uuid?: string }[]; config?: { turnLimitSeconds: number } }
     | { type: 'RECONNECT_PLAYER'; oldId: string; newId: string }
-    | { type: 'PASS_TURN' }
+    | { type: 'PASS_TURN'; expectedPlayerIndex?: number }
     | { type: 'SELECT_LOCATION'; locationId: string };
 
 // Shuffle helper
@@ -360,6 +360,12 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
         }
 
         case 'PASS_TURN': {
+            // Safety Check: Prevent double-skips if multiple clients force pass
+            if (action.expectedPlayerIndex !== undefined && action.expectedPlayerIndex !== state.currentPlayerIndex) {
+                console.warn("Stale PASS_TURN received. Ignoring.", action.expectedPlayerIndex, state.currentPlayerIndex);
+                return state;
+            }
+
             const player = state.players[state.currentPlayerIndex];
             const newState = {
                 ...state,

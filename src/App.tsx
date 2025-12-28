@@ -254,12 +254,20 @@ function App() {
 							</ul>
 						</div>
 
-						{state.players.length >= 2 && (
-							mpState.isHost ? (
-								<button className="btn-primary" onClick={handleStartGame}>Start Game</button>
-							) : (
-								<p>Waiting for host to start...</p>
-							)
+						{mpState.isHost ? (
+							<button
+								className="btn-primary"
+								onClick={handleStartGame}
+								disabled={state.players.length < 2}
+								style={{
+									opacity: state.players.length < 2 ? 0.5 : 1,
+									cursor: state.players.length < 2 ? 'not-allowed' : 'pointer'
+								}}
+							>
+								{state.players.length < 2 ? "Waiting for 2nd Player..." : "Start Game"}
+							</button>
+						) : (
+							<p>Waiting for host to start...</p>
 						)}
 					</div>
 				</div>

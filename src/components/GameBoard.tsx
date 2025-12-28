@@ -401,17 +401,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             setTimeLeft(remaining);
 
             // Clock Tick Effect
-            // Play tick if:
-            // 1. It is my turn
-            // 2. Time is low (<= 10 seconds)
-            // 3. Time > 0 (don't tick on 0)
             if (isMyTurn && remaining <= 10 && remaining > 0) {
                 playTickSound();
             }
 
-            if (remaining <= 0 && isMyTurn) {
-                console.log("Timer expired.");
-                dispatch({ type: 'PASS_TURN' });
+            // Auto-Pass Logic (Universal Enforcement)
+            if (remaining <= 0) {
+                // If the turn has expired, ANYONE connected can trigger the pass.
+                // We send the 'expectedPlayerIndex' to ensure we only skip the current player ONCE.
+                // It is harmless if multiple people send it, the reducer will reject duplicates.
+                // We dispatch on the next tick check.
+
+                // To avoid spamming, we check if we "should" be the ones to send it.
+                // Usually the Host should do it if active player is away, or the active player themselves.
+                // Fail-safe: Everyone sends attempts, server syncs the first one.
+
+                // Only dispatch if we haven't received a new turn status yet (which we haven't if deadine is old)
+                dispatch({ type: 'PASS_TURN', expectedPlayerIndex: state.currentPlayerIndex });
             }
         };
 
@@ -419,7 +425,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         updateTimer(); // Initial call
 
         return () => clearInterval(timer);
-    }, [state.turnDeadline, isMyTurn, dispatch, playTickSound]);
+    }, [state.turnDeadline, state.currentPlayerIndex, dispatch, playTickSound, isMyTurn]);
 
     const totalSeconds = state.config.turnLimitSeconds;
     const percentage = Math.max(0, Math.min(1, timeLeft / totalSeconds));
@@ -1035,7 +1041,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                 setConfirmModal({
                                     message: "Pass your turn without taking any action?",
                                     onConfirm: () => {
-                                        dispatch({ type: 'PASS_TURN' });
+                                        dispatch({ type: 'PASS_TURN', expectedPlayerIndex: state.currentPlayerIndex });
                                     }
                                 });
                             }}
