@@ -33,6 +33,7 @@ function App() {
 	const [turnLimit, setTurnLimit] = useState(60);
 	const [formError, setFormError] = useState('');
 	const [isLocal, setIsLocal] = useState(false);
+	const [copyFeedback, setCopyFeedback] = useState(false);
 
 	// Clear error when name or id changes
 	useEffect(() => {
@@ -202,8 +203,43 @@ function App() {
 				<div className="lobby-container">
 					<div className="glass-panel" style={{ textAlign: 'center' }}>
 						<h2>Waiting Room</h2>
-						<div style={{ background: '#222', padding: '10px', borderRadius: '5px', userSelect: 'all', cursor: 'pointer', border: '1px dashed #555', marginBottom: '20px' }}>
-							{mpState.gameId}
+						<div
+							onClick={() => {
+								if (mpState.gameId) {
+									navigator.clipboard.writeText(mpState.gameId);
+									setCopyFeedback(true);
+									setTimeout(() => setCopyFeedback(false), 2000);
+								}
+							}}
+							style={{
+								background: '#222',
+								padding: '10px',
+								borderRadius: '5px',
+								userSelect: 'all',
+								cursor: 'pointer',
+								border: '1px dashed #555',
+								marginBottom: '20px',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								gap: '10px',
+								transition: 'background 0.2s'
+							}}
+							title="Click to Copy"
+							onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
+							onMouseLeave={(e) => e.currentTarget.style.background = '#222'}
+						>
+							<span style={{ fontFamily: 'monospace', fontSize: '1.2rem', letterSpacing: '1px' }}>{mpState.gameId}</span>
+							<span style={{
+								background: copyFeedback ? '#4caf50' : '#444',
+								padding: '4px 8px',
+								borderRadius: '4px',
+								fontSize: '0.8rem',
+								color: 'white',
+								transition: 'all 0.2s'
+							}}>
+								{copyFeedback ? "Copied!" : "Copy"}
+							</span>
 						</div>
 						<small>Share this Game Code</small>
 

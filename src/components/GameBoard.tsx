@@ -182,7 +182,7 @@ const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe }: { 
             <h3 style={{ margin: 0, fontSize: '1rem', color: isActive ? 'var(--marvel-green)' : 'inherit', textShadow: isActive ? '0 0 10px var(--marvel-green)' : 'none' }}>
                 {player.name} {isMe ? <span style={{ color: 'var(--marvel-blue)', fontSize: '0.8rem' }}>(You)</span> : ''}
             </h3>
-            <div style={{ fontWeight: 'bold', color: 'var(--marvel-yellow)' }}>{player.points} Victory Points</div>
+            <div style={{ fontWeight: 'bold', color: 'var(--marvel-yellow)' }}>{player.points} VP</div>
         </div>
 
         {/* Tokens */}
