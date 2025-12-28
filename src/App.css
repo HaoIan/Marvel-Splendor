@@ -181,6 +181,7 @@ body {
 }
 
 .player-panel.right {
+  border-radius: 25px;
   grid-area: player-right;
   overflow-y: auto;
   overflow-x: hidden;
