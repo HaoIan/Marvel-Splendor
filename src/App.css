@@ -394,6 +394,7 @@ body {
 }
 
 .player-card {
+  margin-top: 15px;
   background: var(--bg-panel);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -655,11 +656,9 @@ body {
     overflow-x: auto;
     overflow-y: hidden;
     /* Prevent vertical scrollbar */
-    padding-top: 5px;
     justify-content: flex-start !important;
     /* Override inline style */
     padding-left: 10px;
-    margin-bottom: 0px !important;
     /* Reduced from 20px */
     min-height: 115px;
     /* Reduced from 140px to fit scaled 130px*0.85 = 110.5px card */
@@ -716,5 +715,98 @@ body {
 @media (min-width: 769px) {
   .mobile-only-btn {
     display: none !important;
+  }
+}
+
+/* ============================================
+   RESPONSIVE UTILITY CLASSES
+   ============================================ */
+
+/* Desktop-only: visible on screens > 768px */
+.desktop-only {
+  display: none !important;
+}
+
+/* Mobile-only: visible on screens <= 768px */
+.mobile-only {
+  display: flex !important;
+}
+
+@media (min-width: 769px) {
+  .desktop-only {
+    display: flex !important;
+  }
+
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   DESKTOP HEADER BAR
+   ============================================ */
+
+.desktop-header-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: clamp(50px, 5vw, 80px);
+  background: transparent;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(5px, 1vw, 15px) clamp(10px, 2vw, 40px);
+  gap: clamp(10px, 2vw, 30px);
+}
+
+.desktop-header-bar .header-timer {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1vw, 12px);
+  padding: clamp(4px, 0.5vw, 10px) clamp(12px, 1.5vw, 24px);
+  border-radius: 30px;
+  font-weight: bold;
+  font-size: clamp(0.75rem, 1vw, 1rem);
+  transition: all 0.3s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.desktop-header-bar .header-controls {
+  display: flex;
+  align-items: center;
+  gap: clamp(4px, 0.8vw, 12px);
+}
+
+.desktop-header-bar .header-controls button {
+  padding: clamp(4px, 0.5vw, 10px) clamp(8px, 1vw, 18px) !important;
+  font-size: clamp(1rem, 1vw, 1.5rem) !important;
+  white-space: nowrap;
+}
+
+.desktop-header-bar .header-tokens {
+  display: flex;
+  align-items: center;
+}
+
+.desktop-header-bar .header-tokens .token {
+  width: clamp(35px, 6vw, 100px) !important;
+  height: clamp(35px, 6vw, 100px) !important;
+}
+
+.desktop-header-bar .header-tokens .token span {
+  font-size: clamp(0.6rem, 1.5vw, 1.5rem) !important;
+}
+
+/* Add top padding to game layout when header is present */
+.game-layout.has-desktop-header {
+  padding-top: clamp(60px, 6vw, 90px);
+}
+
+@media (max-width: 768px) {
+  .game-layout.has-desktop-header {
+    padding-top: 0;
   }
 }

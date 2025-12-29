@@ -236,7 +236,9 @@ function App() {
 								borderRadius: '4px',
 								fontSize: '0.8rem',
 								color: 'white',
-								transition: 'all 0.2s'
+								transition: 'all 0.2s',
+								minWidth: '55px',
+								textAlign: 'center'
 							}}>
 								{copyFeedback ? "Copied!" : "Copy"}
 							</span>
