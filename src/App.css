@@ -706,6 +706,12 @@ body {
   .deck-count {
     position: static !important;
     margin-right: 5px !important;
+    width: clamp(25px, 8vw, 40px) !important;
+    font-size: clamp(0.5rem, 2vw, 0.8rem) !important;
+  }
+
+  .deck-count span:first-child {
+    font-size: clamp(0.7rem, 3vw, 1.2rem) !important;
   }
 
   /* Reset excess margin since deck count is now in flow */
