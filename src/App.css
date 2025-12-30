@@ -653,39 +653,69 @@ body {
 
   .locations-row {
     width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    /* Prevent vertical scrollbar */
-    justify-content: flex-start !important;
-    /* Override inline style */
-    padding-left: 10px;
-    /* Reduced from 20px */
-    min-height: 115px;
-    /* Reduced from 140px to fit scaled 130px*0.85 = 110.5px card */
+    overflow-x: visible;
+    overflow-y: visible;
+    justify-content: center !important;
+    min-height: auto;
+    flex-wrap: wrap;
+    gap: 2vw;
+    padding-top: 100px;
   }
 
   .locations-row>div {
     flex-shrink: 0;
-    margin-right: -10px;
-    /* Compensate for negative margin of cards to keep them close but not overlapping? No, let's just let them space naturally or tight */
+    margin: 0;
   }
 
-  /* Scale down cards slightly */
+  /* Fluid card sizing based on viewport - fit deck indicator + 4 cards per row */
+  /* 100vw - 50px (deck count) - 20px (padding) = available for 4 cards */
   .card {
-    transform: scale(0.85);
-    margin: -10px;
-    /*Compensate for scale spacing*/
+    width: calc((100vw - 70px) / 5.5) !important;
+    height: calc(((100vw - 70px) / 5.5) * 1.4) !important;
+    transform: none;
+    margin: 0;
     transform-origin: center center;
+    min-width: 50px;
+    max-width: 100px;
+    font-size: clamp(0.45rem, 1.8vw, 0.75rem);
+    flex-shrink: 0;
   }
 
-  /* Reset margins for specific containers if needed */
+  /* Location tiles - fit 4 per row */
+  .locations-row .card.location {
+    width: calc((100vw - 60px) / 4) !important;
+    height: calc((100vw - 60px) / 4) !important;
+    max-width: 130px;
+    max-height: 130px;
+  }
+
   .market-grid .card {
-    margin: -12px;
+    margin: 2px;
+  }
+
+  .card-row {
+    width: 100%;
+    overflow-x: hidden;
+    padding-bottom: 5px;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  /* Make deck count flow naturally */
+  .deck-count {
+    position: static !important;
+    margin-right: 5px !important;
+  }
+
+  /* Reset excess margin since deck count is now in flow */
+  .market-grid .card-row>div:first-child {
+    margin-right: 10px;
   }
 
   /* Handle deck count positioning with the scaling */
   .market-grid .card-row>div:first-child {
-    margin-right: 20px;
+    margin-right: 8px;
   }
 
   /* Reduce scrollbar height for mobile horizontal scrolling */

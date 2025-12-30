@@ -1042,7 +1042,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
 
                 {/* Locations */}
-                <div className="locations-row" style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '15px' }}>
+                <div className="locations-row" style={{ display: 'flex', justifyContent: 'center' }}>
                     {(state.locations || []).map(loc => {
                         const isPendingSelection = state.pendingLocationSelection?.some(l => l.id === loc.id) && isMyTurn;
                         return (
