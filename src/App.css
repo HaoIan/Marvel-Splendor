@@ -250,6 +250,11 @@ body {
   gap: 1rem;
 }
 
+.locations-row {
+  display: flex;
+  gap: 2vw;
+}
+
 .card {
   width: 120px;
   height: 168px;
@@ -658,7 +663,6 @@ body {
     justify-content: center !important;
     min-height: auto;
     flex-wrap: wrap;
-    gap: 2vw;
     padding-top: 100px;
   }
 
