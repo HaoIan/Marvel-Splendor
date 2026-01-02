@@ -531,6 +531,15 @@ body {
   background: rgba(50, 50, 50, 0.95);
 }
 
+/* Card and location name labels - default/desktop sizing */
+.card-name-label {
+  max-width: 80px;
+}
+
+.location-name-label {
+  max-width: 100px;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   /* ============================================
@@ -751,9 +760,22 @@ body {
     font-size: 0.45rem !important;
   }
 
-  .card .card-name {
-    display: none;
-    /* Hide name on cards, show in modal */
+  /* Card and location name labels - tightly truncated on mobile */
+  .card-name-label {
+    max-width: 40px !important;
+    font-size: 0.40rem !important;
+  }
+
+  .location-name-label {
+    max-width: 50px !important;
+    font-size: 0.40rem !important;
+  }
+
+  /* Modal shows full names - override truncation */
+  #modal-card-view .card-name-label,
+  .location-modal .location-name-label {
+    max-width: none !important;
+    font-size: 0.7rem !important;
   }
 
   /* Deck count styling - compact */
@@ -918,6 +940,62 @@ body {
     max-height: 80vh !important;
     padding: 1rem !important;
     overflow-y: auto;
+  }
+
+  /* Lobby/Menu compact styling for mobile */
+  .lobby-container {
+    padding: 10px !important;
+    padding-top: env(safe-area-inset-top) !important;
+    overflow: hidden !important;
+    min-height: 100dvh !important;
+    height: 100dvh !important;
+  }
+
+  .lobby-container .glass-panel {
+    padding: 0.75rem !important;
+    max-height: calc(100dvh - 20px) !important;
+  }
+
+  .lobby-container h1 {
+    font-size: 2rem !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  .lobby-container h3 {
+    font-size: 1rem !important;
+    margin: 0.5rem 0 !important;
+  }
+
+  .lobby-container p {
+    margin-bottom: 0.75rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  .lobby-container input {
+    padding: 8px !important;
+    font-size: 0.9rem !important;
+  }
+
+  .lobby-container .btn-primary {
+    padding: 8px 16px !important;
+    font-size: 0.9rem !important;
+  }
+
+  .lobby-container button {
+    padding: 6px 12px !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* Timer selection buttons - more compact */
+  .lobby-container div[style*="inline-flex"] button {
+    padding: 6px 10px !important;
+    font-size: 0.75rem !important;
+    min-width: 40px !important;
+  }
+
+  /* Reduce gaps in lobby */
+  .lobby-container div[style*="flex-direction: column"] {
+    gap: 0.5rem !important;
   }
 
   /* Toast positioning */

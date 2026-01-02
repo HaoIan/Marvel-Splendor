@@ -119,10 +119,10 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: {
                 ))}
             </div>
             {card.name && !hideName && (
-                <div style={{
+                <div className="card-name-label" style={{
                     position: 'absolute', bottom: '2px', right: '2px',
                     fontSize: '0.6rem', background: 'rgba(0,0,0,0.7)', padding: '1px 3px', borderRadius: '3px',
-                    maxWidth: '65px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     textShadow: '0 1px 1px black'
                 }}>
                     {card.name}
@@ -164,10 +164,10 @@ const LocationView = ({ location, onClick, style, disabled, hideName }: { locati
         </div>
 
         {!hideName && (
-            <div style={{
+            <div className="location-name-label" style={{
                 position: 'absolute', bottom: '2px', right: '2px',
                 fontSize: '0.6rem', background: 'rgba(0,0,0,0.7)', padding: '1px 3px', borderRadius: '3px',
-                maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 textShadow: '0 1px 1px black', color: 'white'
             }}>
                 {location.name}
