@@ -257,56 +257,6 @@ const getTimerColor = (percentage: number) => {
     return `hsl(${hue}, 90%, 45%)`;
 };
 
-// Dumb Presentational Component
-const GameTimer = ({
-    timeLeft,
-    isMyTurn,
-    playerName,
-    dynamicColor
-}: {
-    timeLeft: number;
-    totalSeconds?: number;
-    isMyTurn: boolean;
-    playerName: string;
-    dynamicColor: string;
-}) => {
-    // Base styles
-    const styles: React.CSSProperties = {
-        position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)',
-        padding: '8px 24px', borderRadius: '30px',
-        fontSize: '1rem', fontWeight: 'bold',
-        pointerEvents: 'none', zIndex: 1000,
-        display: 'flex', alignItems: 'center', gap: '12px',
-        transition: 'all 1s linear',
-
-        // Dynamic colors
-        background: isMyTurn ? `rgba(0,0,0,0.8)` : 'rgba(0,0,0,0.6)',
-        border: `2px solid ${isMyTurn ? dynamicColor : '#555'}`,
-        color: isMyTurn ? dynamicColor : '#aaa',
-        boxShadow: isMyTurn ? `0 0 15px ${dynamicColor}` : 'none',
-    };
-
-    return (
-        <div style={styles}>
-            <span>
-                {isMyTurn
-                    ? "Your Turn"
-                    : `${playerName.length > 12 ? playerName.slice(0, 12) + '...' : playerName}'s Turn`
-                }
-            </span>
-            <span style={{
-                fontFamily: 'monospace',
-                fontSize: '1.2rem',
-                background: 'rgba(255,255,255,0.1)',
-                padding: '2px 8px',
-                borderRadius: '4px'
-            }}>
-                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-            </span>
-        </div>
-    );
-};
-
 interface GameBoardProps {
     state: GameState;
     dispatch: (action: GameAction) => void;
