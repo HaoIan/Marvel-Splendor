@@ -34,6 +34,7 @@ function App() {
 	const [formError, setFormError] = useState('');
 	const [isLocal, setIsLocal] = useState(false);
 	const [copyFeedback, setCopyFeedback] = useState(false);
+	const [randomizeOrder, setRandomizeOrder] = useState(true);
 
 	// Clear error when name or id changes
 	useEffect(() => {
@@ -63,7 +64,17 @@ function App() {
 			// But this is inside the specialized lobby view.
 			return;
 		}
-		dispatch({ type: 'START_GAME', players: state.players, config: state.config });
+
+		let finalPlayers = [...state.players];
+		if (randomizeOrder && finalPlayers.length >= 2) {
+			// Fisher-Yates Shuffle
+			for (let i = finalPlayers.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[finalPlayers[i], finalPlayers[j]] = [finalPlayers[j], finalPlayers[i]];
+			}
+		}
+
+		dispatch({ type: 'START_GAME', players: finalPlayers, config: state.config });
 	};
 
 	return (
@@ -257,17 +268,35 @@ function App() {
 						</div>
 
 						{mpState.isHost ? (
-							<button
-								className="btn-primary"
-								onClick={handleStartGame}
-								disabled={state.players.length < 2}
-								style={{
-									opacity: state.players.length < 2 ? 0.5 : 1,
-									cursor: state.players.length < 2 ? 'not-allowed' : 'pointer'
-								}}
-							>
-								{state.players.length < 2 ? "Waiting for 2nd Player..." : "Start Game"}
-							</button>
+							<>
+								<div style={{ marginBottom: '15px' }}>
+									<label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer', gap: '8px', userSelect: 'none' }}>
+										<input
+											type="checkbox"
+											checked={randomizeOrder}
+											onChange={(e) => setRandomizeOrder(e.target.checked)}
+											style={{
+												cursor: 'pointer',
+												width: '18px',
+												height: '18px',
+												accentColor: '#4facfe'
+											}}
+										/>
+										<span style={{ color: '#ccc', fontSize: '0.95rem' }}>Randomize Player Order</span>
+									</label>
+								</div>
+								<button
+									className="btn-primary"
+									onClick={handleStartGame}
+									disabled={state.players.length < 2}
+									style={{
+										opacity: state.players.length < 2 ? 0.5 : 1,
+										cursor: state.players.length < 2 ? 'not-allowed' : 'pointer'
+									}}
+								>
+									{state.players.length < 2 ? "Waiting for 2nd Player..." : "Start Game"}
+								</button>
+							</>
 						) : (
 							<p>Waiting for host to start...</p>
 						)}
