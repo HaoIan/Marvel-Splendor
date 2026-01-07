@@ -1020,10 +1020,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                             color: 'white',
                             border: '1px solid #ff4444',
                             borderRadius: '4px',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            marginLeft: '5px'
                         }}
                     >
-                        ✕
+                        Quit Game
                     </button>
                 )}
             </div>
