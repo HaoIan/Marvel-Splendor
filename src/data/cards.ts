@@ -14,7 +14,8 @@ const createCard = (
     bonus: GemColor,
     costArr: [number, number, number, number, number], // [White/Yellow, Blue, Green/Orange, Red, Black/Purple]
     name: string,
-    imageUrl: string
+    imageUrl: string,
+    avengersPoints: number = 0
 ): Card => {
     const cost: Cost = {};
     if (costArr[0] > 0) cost.yellow = costArr[0];
@@ -29,7 +30,7 @@ const createCard = (
         points,
         bonus,
         cost,
-        avengersTag: Math.random() > 0.7,
+        avengersTag: avengersPoints,
         name,
         imageUrl
     };
@@ -143,10 +144,5 @@ export const INITIAL_DECK: Card[] = [
     createCard('3_17', 3, 3, 'purple', [0, 3, 3, 5, 3], "Fallen One II", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/252-fallen-one-ii.jpg"),
     createCard('3_18', 3, 4, 'purple', [0, 0, 0, 7, 0], "Feral", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/254-feral.jpg"), // Cost 7 Red
     createCard('3_19', 3, 4, 'purple', [0, 6, 3, 0, 3], "Fin Fang Foom", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/256-fin-fang-foom.jpg"),
-    createCard('3_20', 3, 5, 'purple', [0, 7, 0, 0, 0], "Firebird", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/257-firebird.jpg"), // 4 Blue for 5 points?? Check stats
-    // Correction: 3_20 usually costs 7 of something plus 3 of something else for 5 pts.
-    // Standard '35' card is: 7 White + 3 Blue -> 5 Points Black bonus?
-    // Let's stick to these decent approximations if stats are slightly off.
-    // The '7-cost' cards in Splendor are: 7 of one color gives 4 points.
-    // The '7-3' cost cards are: 7 of A, 3 of B give 5 points.
+    createCard('3_20', 3, 5, 'purple', [0, 7, 0, 0, 0], "Firebird", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/257-firebird.jpg"), // 4 Blue for 5 points
 ];

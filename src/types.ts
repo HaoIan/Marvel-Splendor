@@ -26,7 +26,7 @@ export interface Card {
   points: number;
   bonus: GemColor; // The gem color this card provides as a discount
   cost: Cost;
-  avengersTag?: boolean; // For the Avengers Assemble tile condition
+  avengersTag?: number; // For the Avengers Assemble tile condition
   imageUrl?: string; // Placeholder for now, can be mapped to assets later
   name?: string;
 }

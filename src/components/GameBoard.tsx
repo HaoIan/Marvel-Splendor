@@ -102,6 +102,20 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: {
         >
             <div className="card-header">
                 <span className="card-points">{card.points || ''}</span>
+                {card.avengersTag !== undefined && card.avengersTag > 0 && (
+                    <div style={{
+                        position: 'absolute', top: '4px', right: card.tier === 3 ? '25px' : '6px',
+                        width: '18px', height: '18px', borderRadius: '50%',
+                        background: 'linear-gradient(135deg, darkgray, black)',
+                        boxShadow: '0 0 3px black',
+                        border: '1px solid white',
+                        color: 'white', fontSize: '12px', fontWeight: 'bold',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 2
+                    }} title="Avengers Tag">
+                        A
+                    </div>
+                )}
                 {card.tier === 3 && (
                     <div style={{
                         position: 'absolute', top: '5px', right: '5px',
@@ -1043,10 +1057,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 ))}
             </div>
 
-
-
             <div className="board-center">
-
 
                 {/* Locations */}
                 <div className="locations-row" style={{ display: 'flex', justifyContent: 'center' }}>
