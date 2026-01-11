@@ -193,7 +193,7 @@ const LocationView = ({ location, onClick, style, disabled, hideName }: { locati
     </div>
 );
 
-const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe, hasAvengersTile }: { player: Player, isActive: boolean, onCardClick: (card: CardType) => void, onLocationClick: (loc: Location) => void, isMe?: boolean, hasAvengersTile?: boolean }) => (
+const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe, hasAvengersTile, onAvengersClick }: { player: Player, isActive: boolean, onCardClick: (card: CardType) => void, onLocationClick: (loc: Location) => void, isMe?: boolean, hasAvengersTile?: boolean, onAvengersClick?: () => void }) => (
     <div id={`player-area-${player.id}`} className={`player-card ${isActive ? 'active-turn' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: '1rem', color: isActive ? 'var(--marvel-green)' : 'inherit', textShadow: isActive ? '0 0 10px var(--marvel-green)' : 'none' }}>
@@ -239,12 +239,15 @@ const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe, hasA
                     {hasAvengersTile && (
                         <div style={{ transform: 'scale(0.5)', transformOrigin: 'top left', width: '75px', height: '75px' }}>
                             {/* Render Avengers Tile as a simplified LocationView or Image */}
-                            <div className="card location" style={{
-                                width: '130px', height: '130px',
-                                backgroundImage: `url("${avengersTileImg}")`,
-                                backgroundSize: 'cover', borderRadius: '10px', border: '1px solid white',
-                                display: 'flex', flexDirection: 'column'
-                            }} title="Avengers Assemble Tile (+3 VP)">
+                            <div className="card location"
+                                onClick={onAvengersClick}
+                                style={{
+                                    width: '130px', height: '130px',
+                                    backgroundImage: `url("${avengersTileImg}")`,
+                                    backgroundSize: 'cover', borderRadius: '10px', border: '1px solid white',
+                                    display: 'flex', flexDirection: 'column',
+                                    cursor: 'pointer'
+                                }} title="Avengers Assemble Tile (+3 VP)">
                                 <div className="card-header">
                                     <span className="card-points" style={{ textShadow: '0 0 5px gold, 0 1px 2px black', color: 'white' }}>3</span>
                                 </div>
@@ -254,8 +257,7 @@ const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe, hasA
                                         color: 'white', border: '1px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         fontSize: '0.8rem', fontWeight: 'bold'
                                     }}>
-                                        <span style={{ fontSize: '0.6rem', marginRight: '2px' }}>A:</span>3
-                                    </div>
+                                        3</div>
                                 </div>
                             </div>
                         </div>
@@ -348,6 +350,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     // Timer Logic Lifted Up
     const [timeLeft, setTimeLeft] = useState(0);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+    const [showAvengersModal, setShowAvengersModal] = useState(false);
 
     // Auto-acquire single location with delay for animation
     useEffect(() => {
@@ -388,9 +391,33 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             if (lastLog.includes('took location')) {
                 setToastMsg({ msg: lastLog, type: 'success' });
             }
+            // Check for Avengers tile
+            if (lastLog.includes('Avengers Assemble tile')) {
+                setToastMsg({ msg: lastLog, type: 'success' });
+            }
         }
         prevLogLength.current = state.logs.length;
     }, [state.logs]);
+
+    // Avengers Tile Animation Latch
+    const prevAvengersOwnerIdRef = useRef<string | null | undefined>(state.avengersTileOwnerId);
+
+    // Animate Avengers Tile changes
+    useEffect(() => {
+        const currentOwner = state.avengersTileOwnerId;
+        const prevOwner = prevAvengersOwnerIdRef.current;
+
+        // Condition: New valid owner, and different from previous (including null -> owner)
+        if (currentOwner && currentOwner !== prevOwner) {
+            const startId = prevOwner ? `player-area-${prevOwner}` : 'locations-row';
+            const endId = `player-area-${currentOwner}`;
+
+            triggerAnimation('card', avengersTileImg, startId, endId);
+            playRecruitSound();
+        }
+
+        prevAvengersOwnerIdRef.current = currentOwner;
+    }, [state.avengersTileOwnerId, playRecruitSound]);
 
     // Auto-clear toastMsg
     useEffect(() => {
@@ -1103,15 +1130,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             <div className="board-center">
 
                 {/* Locations */}
-                <div className="locations-row" style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                <div id="locations-row" className="locations-row" style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
                     {/* Avengers Tile (Unowned) */}
                     {!state.avengersTileOwnerId && (
-                        <div className="card location" style={{
-                            width: '130px', height: '130px',
-                            backgroundImage: `url("${avengersTileImg}")`,
-                            backgroundSize: 'cover', borderRadius: '10px', border: '1px solid white',
-                            display: 'flex', flexDirection: 'column'
-                        }} title="Avengers Assemble Tile (+3 VP)">
+                        <div className="card location"
+                            onClick={() => setShowAvengersModal(true)}
+                            style={{
+                                width: '130px', height: '130px',
+                                backgroundImage: `url("${avengersTileImg}")`,
+                                backgroundSize: 'cover', borderRadius: '10px', border: '1px solid white',
+                                display: 'flex', flexDirection: 'column',
+                                cursor: 'pointer'
+                            }} title="Avengers Assemble Tile (+3 VP)">
                             <div className="card-header">
                                 <span className="card-points" style={{ textShadow: '0 0 5px gold, 0 1px 2px black', color: 'white' }}>3</span>
                             </div>
@@ -1249,6 +1279,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                             onLocationClick={setSelectedLocation}
                             isMe={p.id === myPeerId}
                             hasAvengersTile={p.id === state.avengersTileOwnerId}
+                            onAvengersClick={() => setShowAvengersModal(true)}
                         />
                     ))}
                 </div>
@@ -1398,6 +1429,74 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 </div>
             )}
 
+            {/* Avengers Modal */}
+            {showAvengersModal && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                    background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
+                }} onClick={() => setShowAvengersModal(false)}>
+                    <div className="glass-panel" style={{ textAlign: 'center', border: '1px solid white', boxShadow: '0 0 30px white' }} onClick={e => e.stopPropagation()}>
+                        <h3>Avengers Assemble Tile</h3>
+                        <div style={{ margin: '20px auto', display: 'flex', justifyContent: 'center' }}>
+                            <div style={{ transform: 'scale(1.5)', margin: '30px' }}>
+                                {/* Render simplified tile view here for inspection */}
+                                <div className="card location" style={{
+                                    width: '130px', height: '130px',
+                                    backgroundImage: `url("${avengersTileImg}")`,
+                                    backgroundSize: 'cover', borderRadius: '10px', border: '1px solid white',
+                                    display: 'flex', flexDirection: 'column', pointerEvents: 'none'
+                                }}>
+                                    <div className="card-header">
+                                        <span className="card-points" style={{ textShadow: '0 0 5px gold, 0 1px 2px black', color: 'white' }}>3</span>
+                                    </div>
+                                    <div className="card-cost" style={{ flexDirection: 'column-reverse' }}>
+                                        <div className="cost-bubble" style={{
+                                            borderRadius: '25%', background: 'linear-gradient(135deg, darkgray, black)',
+                                            color: 'white', border: '1px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: '0.8rem'
+                                        }}>3</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ marginBottom: '20px', color: '#ddd' }}>
+                            {(() => {
+                                const player = viewingPlayer;
+                                const currentTags = player.tableau.reduce((sum, c) => sum + (c.avengersTag || 0), 0);
+                                const ownerId = state.avengersTileOwnerId;
+
+                                if (ownerId === player.id) {
+                                    return <span style={{ color: 'lime', fontWeight: 'bold' }}>You currently hold this title!</span>;
+                                }
+
+                                let required = 3;
+                                if (ownerId) {
+                                    const owner = state.players.find(p => p.id === ownerId);
+                                    if (owner) {
+                                        const ownerTags = owner.tableau.reduce((sum, c) => sum + (c.avengersTag || 0), 0);
+                                        required = ownerTags + 1;
+                                    }
+                                }
+
+                                if (currentTags >= required) {
+                                    return <span style={{ color: 'lime', fontWeight: 'bold' }}>You qualify for this title!</span>;
+                                } else {
+                                    const needed = required - currentTags;
+                                    return (
+                                        <span>
+                                            Missing: {needed} Avenger Card{needed > 1 ? 's' : ''}
+                                        </span>
+                                    );
+                                }
+                            })()}
+                        </div>
+                        <button style={{ padding: '10px', background: 'transparent', border: '1px solid #666', color: 'white', borderRadius: '4px', cursor: 'pointer' }} onClick={() => setShowAvengersModal(false)}>
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* On-board Selection Banner */}
             {state.pendingLocationSelection && state.pendingLocationSelection.length > 1 && isMyTurn && (
                 <div style={{
@@ -1426,6 +1525,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         <div style={{ marginBottom: '20px', color: '#ddd' }}>
                             {(() => {
                                 const player = viewingPlayer;
+
+                                // Check if location is already claimed by anyone
+                                const owner = state.players.find(p => p.locations.some(l => l.id === selectedLocation.id));
+                                if (owner) {
+                                    return <span style={{ color: 'gold', fontWeight: 'bold' }}>Claimed by {owner.name}</span>;
+                                }
+
                                 const bonuses: Record<string, number> = { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0 };
                                 player.tableau.forEach(c => {
                                     if (c.bonus && bonuses[c.bonus] !== undefined) bonuses[c.bonus]++;
@@ -1448,7 +1554,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                 } else {
                                     return (
                                         <span>
-                                            Missing: <strong style={{ color: 'var(--marvel-red)' }}>{missing.join(', ')}</strong>
+                                            Missing: {missing.join(', ')}
                                         </span>
                                     );
                                 }
