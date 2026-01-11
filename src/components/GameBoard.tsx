@@ -242,9 +242,22 @@ const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe, hasA
                             <div className="card location" style={{
                                 width: '130px', height: '130px',
                                 backgroundImage: `url("${avengersTileImg}")`,
-                                backgroundSize: 'cover', borderRadius: '10px', border: '2px solid red',
-                                boxShadow: '0 0 10px red'
-                            }} title="Avengers Assemble Tile (+3 VP)"></div>
+                                backgroundSize: 'cover', borderRadius: '10px', border: '1px solid white',
+                                display: 'flex', flexDirection: 'column'
+                            }} title="Avengers Assemble Tile (+3 VP)">
+                                <div className="card-header">
+                                    <span className="card-points" style={{ textShadow: '0 0 5px gold, 0 1px 2px black', color: 'white' }}>3</span>
+                                </div>
+                                <div className="card-cost" style={{ flexDirection: 'column-reverse' }}>
+                                    <div className="cost-bubble" style={{
+                                        borderRadius: '25%', background: 'linear-gradient(135deg, darkgray, black)',
+                                        color: 'white', border: '1px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: '0.8rem', fontWeight: 'bold'
+                                    }}>
+                                        <span style={{ fontSize: '0.6rem', marginRight: '2px' }}>A:</span>3
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1096,9 +1109,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         <div className="card location" style={{
                             width: '130px', height: '130px',
                             backgroundImage: `url("${avengersTileImg}")`,
-                            backgroundSize: 'cover', borderRadius: '10px', border: '2px solid red',
-                            boxShadow: '0 0 10px red'
-                        }} title="Avengers Assemble Tile (+3 VP)"></div>
+                            backgroundSize: 'cover', borderRadius: '10px', border: '1px solid white',
+                            display: 'flex', flexDirection: 'column'
+                        }} title="Avengers Assemble Tile (+3 VP)">
+                            <div className="card-header">
+                                <span className="card-points" style={{ textShadow: '0 0 5px gold, 0 1px 2px black', color: 'white' }}>3</span>
+                            </div>
+                            <div className="card-cost" style={{ flexDirection: 'column-reverse' }}>
+                                <div className="cost-bubble" style={{
+                                    borderRadius: '25%', background: 'linear-gradient(135deg, darkgray, black)',
+                                    color: 'white', border: '1px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: '0.8rem'
+                                }}>3</div>
+                            </div>
+                        </div>
                     )}
                     {(state.locations || []).map(loc => {
                         const isPendingSelection = state.pendingLocationSelection?.some(l => l.id === loc.id) && isMyTurn;

@@ -231,7 +231,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
 
             // --- Avengers Assemble Tile Mechanic ---
             if (card.avengersTag && card.avengersTag > 0) {
-                const currentAvengersPoints = player.tableau.reduce((sum, c) => sum + (c.avengersTag || 0), 0) + card.avengersTag;
+                const currentAvengersPoints = player.tableau.reduce((sum, c) => sum + (c.avengersTag || 0), 0);
 
                 // If no one owns it and player meets threshold (3)
                 if (!avengersTileOwnerId && currentAvengersPoints >= 3) {
