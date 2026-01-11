@@ -78,6 +78,7 @@ export interface GameState {
   pendingLocationSelection?: Location[]; // If a player qualifies for multiple locations
   turn: number;
   winner: string | null;
+  avengersTileOwnerId?: string | null; // ID of the player who currently holds the Avengers Assemble tile
   logs: string[];
   status: 'LOBBY' | 'PLAYING' | 'GAME_OVER' | 'ABORTED';
   finalRound?: boolean;

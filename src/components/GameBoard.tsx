@@ -10,6 +10,9 @@ import cardBack1 from '../assets/card-backs/card-back-1.png';
 import cardBack2 from '../assets/card-backs/card-back-2.png';
 import cardBack3 from '../assets/card-backs/card-back-3.png';
 
+// Locations
+import avengersTileImg from '../assets/locations/avengers tile.png';
+
 // Token Assets
 import mindToken from '../assets/tokens/mind-token.png';
 import powerToken from '../assets/tokens/power-token.png';
@@ -190,7 +193,7 @@ const LocationView = ({ location, onClick, style, disabled, hideName }: { locati
     </div>
 );
 
-const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe }: { player: Player, isActive: boolean, onCardClick: (card: CardType) => void, onLocationClick: (loc: Location) => void, isMe?: boolean }) => (
+const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe, hasAvengersTile }: { player: Player, isActive: boolean, onCardClick: (card: CardType) => void, onLocationClick: (loc: Location) => void, isMe?: boolean, hasAvengersTile?: boolean }) => (
     <div id={`player-area-${player.id}`} className={`player-card ${isActive ? 'active-turn' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: '1rem', color: isActive ? 'var(--marvel-green)' : 'inherit', textShadow: isActive ? '0 0 10px var(--marvel-green)' : 'none' }}>
@@ -199,7 +202,6 @@ const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe }: { 
             <div style={{ fontWeight: 'bold', color: 'var(--marvel-yellow)' }}>{player.points} VP</div>
         </div>
 
-        {/* Tokens */}
         {/* Tokens */}
         <div style={{ fontSize: '0.7rem', color: '#aaa', marginBottom: '2px' }}>
             Tokens ({Object.values(player.tokens).reduce((a, b) => a + b, 0)}/10)
@@ -224,16 +226,27 @@ const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe }: { 
             </div>
         )}
 
-        {/* Acquired Locations */}
-        {player.locations.length > 0 && (
+        {/* Acquired Locations & Avengers Tile */}
+        {(player.locations.length > 0 || hasAvengersTile) && (
             <div style={{ marginBottom: '5px' }}>
-                <div style={{ fontSize: '0.7rem', color: '#aaa', marginBottom: '2px' }}>Locations ({player.locations.length})</div>
+                <div style={{ fontSize: '0.7rem', color: '#aaa', marginBottom: '2px' }}>Locations / Titles</div>
                 <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
                     {player.locations.map(loc => (
                         <div key={loc.id} style={{ transform: 'scale(0.5)', transformOrigin: 'top left', width: '75px', height: '75px' }}>
                             <LocationView location={loc} onClick={() => onLocationClick(loc)} />
                         </div>
                     ))}
+                    {hasAvengersTile && (
+                        <div style={{ transform: 'scale(0.5)', transformOrigin: 'top left', width: '75px', height: '75px' }}>
+                            {/* Render Avengers Tile as a simplified LocationView or Image */}
+                            <div className="card location" style={{
+                                width: '130px', height: '130px',
+                                backgroundImage: `url("${avengersTileImg}")`,
+                                backgroundSize: 'cover', borderRadius: '10px', border: '2px solid red',
+                                boxShadow: '0 0 10px red'
+                            }} title="Avengers Assemble Tile (+3 VP)"></div>
+                        </div>
+                    )}
                 </div>
             </div>
         )}
@@ -1060,7 +1073,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             <div className="board-center">
 
                 {/* Locations */}
-                <div className="locations-row" style={{ display: 'flex', justifyContent: 'center' }}>
+                <div className="locations-row" style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                    {/* Avengers Tile (Unowned) */}
+                    {!state.avengersTileOwnerId && (
+                        <div className="card location" style={{
+                            width: '130px', height: '130px',
+                            backgroundImage: `url("${avengersTileImg}")`,
+                            backgroundSize: 'cover', borderRadius: '10px', border: '2px solid red',
+                            boxShadow: '0 0 10px red'
+                        }} title="Avengers Assemble Tile (+3 VP)"></div>
+                    )}
                     {(state.locations || []).map(loc => {
                         const isPendingSelection = state.pendingLocationSelection?.some(l => l.id === loc.id) && isMyTurn;
                         return (
@@ -1185,6 +1207,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                             onCardClick={handleCardClick}
                             onLocationClick={setSelectedLocation}
                             isMe={p.id === myPeerId}
+                            hasAvengersTile={p.id === state.avengersTileOwnerId}
                         />
                     ))}
                 </div>

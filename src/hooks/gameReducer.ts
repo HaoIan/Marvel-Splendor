@@ -78,6 +78,7 @@ export const createInitialState = (
         winner: null,
         logs: ['Game initialized.'],
         status: 'LOBBY',
+        avengersTileOwnerId: null,
         config,
         turnDeadline: config.turnLimitSeconds > 0 ? Date.now() + (config.turnLimitSeconds * 1000) : undefined
     };
@@ -225,13 +226,52 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             const newPlayers = [...state.players];
             newPlayers[playerIndex] = player;
 
+            let newStateLogs = [...state.logs, `${player.name} recruited ${card.points}pt card.`];
+            let avengersTileOwnerId = state.avengersTileOwnerId;
+
+            // --- Avengers Assemble Tile Mechanic ---
+            if (card.avengersTag && card.avengersTag > 0) {
+                const currentAvengersPoints = player.tableau.reduce((sum, c) => sum + (c.avengersTag || 0), 0) + card.avengersTag;
+
+                // If no one owns it and player meets threshold (3)
+                if (!avengersTileOwnerId && currentAvengersPoints >= 3) {
+                    avengersTileOwnerId = player.id;
+                    player.points += 3;
+                    newStateLogs.push(`${player.name} claimed the Avengers Assemble tile! (+3 VP)`);
+                }
+                // If someone else owns it, check for steal
+                else if (avengersTileOwnerId && avengersTileOwnerId !== player.id) {
+                    const ownerIndex = newPlayers.findIndex(p => p.id === avengersTileOwnerId);
+                    if (ownerIndex !== -1) {
+                        const owner = newPlayers[ownerIndex];
+                        const ownerAvengersPoints = owner.tableau.reduce((sum, c) => sum + (c.avengersTag || 0), 0);
+
+                        if (currentAvengersPoints > ownerAvengersPoints) {
+                            // Steal!
+                            // Deduct from old owner
+                            const updatedOwner = { ...owner, points: owner.points - 3 };
+                            newPlayers[ownerIndex] = updatedOwner;
+
+                            // Award to new owner
+                            avengersTileOwnerId = player.id;
+                            player.points += 3;
+                            newStateLogs.push(`${player.name} stole the Avengers Assemble tile from ${owner.name}!`);
+                        }
+                    }
+                }
+            }
+
+            const newPlayersWithAvengers = [...newPlayers];
+            newPlayersWithAvengers[playerIndex] = player;
+
             const stateWithRecruit = {
                 ...state,
-                players: newPlayers,
+                players: newPlayersWithAvengers,
                 tokens: newBank,
                 market: newMarket,
                 decks: newDecks,
-                logs: [...state.logs, `${player.name} recruited ${card.points}pt card.`]
+                avengersTileOwnerId,
+                logs: newStateLogs
             };
             return processEndTurn(stateWithRecruit);
         }
