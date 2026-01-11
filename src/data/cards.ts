@@ -52,7 +52,7 @@ export const INITIAL_DECK: Card[] = [
 
     createCard('1_09', 1, 0, 'red', [0, 2, 1, 0, 0], "Angel Dust", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/25-angel-dust.jpg"),
     createCard('1_10', 1, 0, 'red', [3, 0, 0, 0, 0], "Annihilus", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/29-annihilus.jpg"),
-    createCard('1_11', 1, 0, 'red', [1, 1, 1, 0, 1], "Ant-Man", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/31-ant-man-ii.jpg"),
+    createCard('1_11', 1, 0, 'red', [1, 1, 1, 0, 1], "Nova", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/496-nova.jpg"),
     createCard('1_12', 1, 0, 'red', [2, 0, 0, 2, 0], "Apocalypse", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/35-apocalypse.jpg"),
     createCard('1_13', 1, 1, 'red', [4, 0, 0, 0, 0], "Mysterio", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/479-mysterio.jpg"),
     createCard('1_14', 1, 0, 'red', [2, 1, 1, 0, 1], "Arclight", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/41-arclight.jpg"),
@@ -84,7 +84,7 @@ export const INITIAL_DECK: Card[] = [
     createCard('1_37', 1, 1, 'purple', [0, 4, 0, 0, 0], "Blackwing", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/110-blackwing.jpg"),
     createCard('1_38', 1, 0, 'purple', [1, 2, 1, 1, 0], "Blackwulf", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/111-blackwulf.jpg"),
     createCard('1_39', 1, 0, 'purple', [2, 2, 0, 1, 0], "Winter Soldier", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/714-winter-soldier.jpg", 1),
-    createCard('1_40', 1, 0, 'purple', [0, 0, 1, 3, 1], "America Chavez", "src/assets/card-art/Chavez.webp", 1),
+    createCard('1_40', 1, 0, 'purple', [0, 0, 1, 3, 1], "America Chavez", "src/assets/card-art/chavez.png", 1),
 
     // --- LEVEL 2 (Total 30) ---
     createCard('2_01', 2, 2, 'blue', [0, 0, 5, 0, 0], "Blink", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/115-blink.jpg"),

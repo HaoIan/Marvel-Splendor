@@ -105,9 +105,9 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: {
         >
             <div className="card-header">
                 <span className="card-points">{card.points || ''}</span>
-                {card.avengersTag !== undefined && card.avengersTag > 0 && (
-                    <div style={{
-                        position: 'absolute', top: '4px', right: card.tier === 3 ? '25px' : '6px',
+                {card.avengersTag !== undefined && card.avengersTag > 0 && Array.from({ length: card.avengersTag }).map((_, i) => (
+                    <div key={`avenger-tag-${i}`} style={{
+                        position: 'absolute', top: '4px', right: (card.tier === 3 ? 25 : 6) + (i * 20) + 'px',
                         width: '18px', height: '18px', borderRadius: '50%',
                         background: 'linear-gradient(135deg, darkgray, black)',
                         boxShadow: '0 0 3px black',
@@ -118,7 +118,7 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: {
                     }} title="Avengers Tag">
                         A
                     </div>
-                )}
+                ))}
                 {card.tier === 3 && (
                     <div style={{
                         position: 'absolute', top: '5px', right: '5px',
@@ -272,6 +272,23 @@ const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe, hasA
                     </div>
                 ) : null;
             })}
+            {/* Avengers Tag Count */}
+            {(() => {
+                const avengersCount = player.tableau.reduce((sum, c) => sum + (c.avengersTag || 0), 0);
+                return avengersCount > 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.7rem', marginRight: '4px', marginLeft: '5px' }}>
+                        <div style={{
+                            width: '14px', height: '14px',
+                            background: 'linear-gradient(135deg, darkgray, black)',
+                            boxShadow: '0 0 2px black',
+                            borderRadius: '50%', marginRight: '3px', border: '1px solid white',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: 'white', fontSize: '9px', fontWeight: 'bold'
+                        }}>A</div>
+                        {avengersCount}
+                    </div>
+                ) : null;
+            })()}
         </div>
     </div>
 );
