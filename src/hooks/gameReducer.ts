@@ -406,6 +406,8 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 return state;
             }
 
+            if (state.status === 'GAME_OVER') return state;
+
             const player = state.players[state.currentPlayerIndex];
             const newState = {
                 ...state,
@@ -500,7 +502,8 @@ const advanceTurn = (state: GameState): GameState => {
                 currentPlayerIndex: nextIndex, // Reset to 0 just in case
                 winner: winnerNames,
                 status: 'GAME_OVER',
-                logs: [...nextState.logs, `Round Complete. GAME OVER! ${winnerNames} WINS with ${winners[0].points} points!`]
+                logs: [...nextState.logs, `Round Complete. GAME OVER! ${winnerNames} WINS with ${winners[0].points} points!`],
+                turnDeadline: undefined // Stop the timer
             };
         }
     }

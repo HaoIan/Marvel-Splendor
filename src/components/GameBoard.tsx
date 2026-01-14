@@ -431,6 +431,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         if (!state.turnDeadline) return;
 
         const updateTimer = () => {
+            if (state.status === 'GAME_OVER') return;
+
             const remaining = Math.max(0, Math.ceil((state.turnDeadline! - Date.now()) / 1000));
             setTimeLeft(remaining);
 
