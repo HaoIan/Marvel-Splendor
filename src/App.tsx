@@ -108,7 +108,7 @@ function App() {
 									<>
 										{/* Timer Selection */}
 										<div style={{ marginBottom: '20px', color: '#ccc', fontSize: '0.9rem' }}>
-											<label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Turn Timer (seconds)</label>
+											<label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Turn Timer</label>
 											<div style={{
 												display: 'inline-flex',
 												background: 'rgba(255,255,255,0.05)',

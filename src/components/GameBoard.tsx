@@ -1598,37 +1598,39 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
                     {/* Results Modal */}
                     {showResults && (
-                        <div style={{
+                        <div className="victory-modal" style={{
                             position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
                             background: 'rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 2000
                         }}>
-                            <h1 style={{ fontSize: '4rem', color: 'gold', textShadow: '0 0 20px orange', marginBottom: '20px' }}>Game Over!</h1>
-                            <h2 style={{ fontSize: '2rem', color: 'white', marginBottom: '40px' }}>{state.winner} Wins!</h2>
-                            <div style={{ display: 'flex', gap: '20px' }}>
-                                {state.players.map(p => (
-                                    <div key={p.id} style={{
-                                        background: p.name === state.winner ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.1)',
-                                        padding: '20px', borderRadius: '10px', border: p.name === state.winner ? '2px solid gold' : '1px solid #444',
-                                        textAlign: 'center'
-                                    }}>
-                                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '10px' }}>{p.name}</div>
-                                        <div style={{ fontSize: '1.2rem', color: 'var(--marvel-yellow)' }}>{p.points} Victory Points</div>
-                                        <div style={{ fontSize: '0.9rem', color: '#aaa' }}>{p.tableau.length} Cards</div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div style={{ marginTop: '50px', display: 'flex', gap: '20px' }}>
-                                <button onClick={() => setShowResults(false)} style={{ padding: '15px 30px', fontSize: '1.2rem', cursor: 'pointer', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '5px' }}>
-                                    View Board
-                                </button>
-                                <button onClick={() => {
-                                    sessionStorage.removeItem('splendor_gameState');
-                                    sessionStorage.removeItem('splendor_host');
-                                    sessionStorage.removeItem('splendor_gameId');
-                                    window.location.reload();
-                                }} style={{ padding: '15px 30px', fontSize: '1.2rem', cursor: 'pointer', background: 'var(--marvel-blue)', color: 'white', border: 'none', borderRadius: '5px' }}>
-                                    Return to Lobby
-                                </button>
+                            <div className="victory-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', maxHeight: '100vh', overflowY: 'auto', padding: '20px', width: '100%', boxSizing: 'border-box' }}>
+                                <h1 className="victory-title" style={{ fontSize: '4rem', color: 'gold', textShadow: '0 0 20px orange', marginBottom: '20px', textAlign: 'center' }}>Game Over!</h1>
+                                <h2 className="victory-subtitle" style={{ fontSize: '2rem', color: 'white', marginBottom: '40px', textAlign: 'center' }}>{state.winner} Wins!</h2>
+                                <div className="victory-results-grid" style={{ display: 'flex', gap: '20px' }}>
+                                    {state.players.map(p => (
+                                        <div key={p.id} className="victory-card" style={{
+                                            background: p.name === state.winner ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.1)',
+                                            padding: '20px', borderRadius: '10px', border: p.name === state.winner ? '2px solid gold' : '1px solid #444',
+                                            textAlign: 'center', minWidth: '200px'
+                                        }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '10px' }}>{p.name}</div>
+                                            <div style={{ fontSize: '1.2rem', color: 'var(--marvel-yellow)' }}>{p.points} Victory Points</div>
+                                            <div style={{ fontSize: '0.9rem', color: '#aaa' }}>{p.tableau.length} Cards</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="victory-actions" style={{ marginTop: '50px', display: 'flex', gap: '20px' }}>
+                                    <button onClick={() => setShowResults(false)} style={{ padding: '15px 30px', fontSize: '1.2rem', cursor: 'pointer', background: 'transparent', color: 'white', border: '1px solid white', borderRadius: '5px' }}>
+                                        View Board
+                                    </button>
+                                    <button onClick={() => {
+                                        sessionStorage.removeItem('splendor_gameState');
+                                        sessionStorage.removeItem('splendor_host');
+                                        sessionStorage.removeItem('splendor_gameId');
+                                        window.location.reload();
+                                    }} style={{ padding: '15px 30px', fontSize: '1.2rem', cursor: 'pointer', background: 'var(--marvel-blue)', color: 'white', border: 'none', borderRadius: '5px' }}>
+                                        Return to Lobby
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
