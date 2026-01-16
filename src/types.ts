@@ -81,6 +81,7 @@ export interface GameState {
   avengersTileOwnerId?: string | null; // ID of the player who currently holds the Avengers Assemble tile
   logs: string[];
   status: 'LOBBY' | 'PLAYING' | 'GAME_OVER' | 'ABORTED';
+  lastActionAt: number; // Timestamp of the last active move by ANY player
   finalRound?: boolean;
   turnDeadline?: number; // Unix timestamp for when the turn ends
   config: {

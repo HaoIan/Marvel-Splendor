@@ -12,7 +12,8 @@ export type GameAction =
     | { type: 'START_GAME'; players: { id: string; name: string; uuid?: string }[]; config?: { turnLimitSeconds: number } }
     | { type: 'RECONNECT_PLAYER'; oldId: string; newId: string }
     | { type: 'PASS_TURN'; expectedPlayerIndex?: number }
-    | { type: 'SELECT_LOCATION'; locationId: string };
+    | { type: 'SELECT_LOCATION'; locationId: string }
+    | { type: 'ABORT_GAME'; reason: string };
 
 // Shuffle helper
 const shuffle = (array: any[]) => {
@@ -80,7 +81,8 @@ export const createInitialState = (
         status: 'LOBBY',
         avengersTileOwnerId: null,
         config,
-        turnDeadline: config.turnLimitSeconds > 0 ? Date.now() + (config.turnLimitSeconds * 1000) : undefined
+        turnDeadline: config.turnLimitSeconds > 0 ? Date.now() + (config.turnLimitSeconds * 1000) : undefined,
+        lastActionAt: Date.now()
     };
 };
 
@@ -133,12 +135,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 logs: [...state.logs, `${player.name} took tokens.`]
             };
 
-            // Auto End Turn
-            // const endTurnAction = { type: 'END_TURN' } as const;
-            // We can recursively call reducer? Or duplicate logic.
-            // Duplicate logic is safer to avoid deeper stack or confusion.
-            // Actually, we can just extract End Turn logic to a helper.
-            return processEndTurn(stateWithTokens);
+            return processEndTurn({ ...stateWithTokens, lastActionAt: Date.now() });
         }
 
         case 'RECRUIT_CARD': {
@@ -273,7 +270,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 avengersTileOwnerId,
                 logs: newStateLogs
             };
-            return processEndTurn(stateWithRecruit);
+            return processEndTurn({ ...stateWithRecruit, lastActionAt: Date.now() });
         }
 
         case 'RESERVE_CARD': {
@@ -325,7 +322,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 decks: newDecks,
                 logs: [...state.logs, `${player.name} reserved a card.`]
             };
-            return processEndTurn(stateWithReserve);
+            return processEndTurn({ ...stateWithReserve, lastActionAt: Date.now() });
         }
 
         case 'END_TURN': {
@@ -444,8 +441,17 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 logs: [...state.logs, `${player.name} took location: ${selectedLoc.name}`]
             };
 
-            return advanceTurn(stateAfterLocation);
+            return advanceTurn({ ...stateAfterLocation, lastActionAt: Date.now() });
         }
+
+        case 'ABORT_GAME':
+            return {
+                ...state,
+                status: 'LOBBY',
+                logs: [...state.logs, `Game aborted: ${action.reason}`],
+                winner: null,
+                turnDeadline: undefined
+            };
 
         default:
             return state;

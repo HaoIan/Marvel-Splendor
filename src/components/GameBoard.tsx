@@ -433,6 +433,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         const updateTimer = () => {
             if (state.status === 'GAME_OVER') return;
 
+            // AFK Check (Host only to prevent duplicate events)
+            if (isHost && state.lastActionAt && (Date.now() - state.lastActionAt > 300000)) { // 5 minutes
+                dispatch({ type: 'ABORT_GAME', reason: 'No activity for 5 minutes' });
+                return;
+            }
+
             const remaining = Math.max(0, Math.ceil((state.turnDeadline! - Date.now()) / 1000));
             setTimeLeft(remaining);
 
