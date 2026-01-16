@@ -489,6 +489,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const [confirmModal, setConfirmModal] = useState<{ message: string, onConfirm: () => void } | null>(null);
 
     const [showPlayers, setShowPlayers] = useState(false);
+    const [showLogs, setShowLogs] = useState(false);
 
     // Auto-clear toast
     useEffect(() => {
@@ -1215,6 +1216,41 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         </div>
                     ))}
                 </div>
+
+                {/* Mobile Inline Logs - at bottom of board content */}
+                <div className="mobile-inline-logs mobile-only">
+                    <button
+                        className={`game-logs-toggle ${showLogs ? 'expanded' : ''}`}
+                        onClick={() => setShowLogs(!showLogs)}
+                    >
+                        <span className="log-icon">📜</span>
+                        <span>Game Logs</span>
+                        <span className="log-count">{state.logs.length}</span>
+                        <span className="toggle-arrow">{showLogs ? '▲' : '▼'}</span>
+                    </button>
+                    {showLogs && (
+                        <div className="game-logs-content">
+                            <div className="game-logs-header">Recent Activity</div>
+                            {state.logs.slice(-25).reverse().map((log, i) => {
+                                let logType = '';
+                                if (log.includes('took tokens')) logType = 'log-tokens';
+                                else if (log.includes('recruited')) logType = 'log-recruit';
+                                else if (log.includes('reserved')) logType = 'log-reserve';
+                                else if (log.includes('location')) logType = 'log-location';
+                                else if (log.includes('Avengers')) logType = 'log-avengers';
+                                else if (log.includes('passed')) logType = 'log-pass';
+                                else if (log.includes('initialized') || log.includes('triggered') || log.includes('aborted')) logType = 'log-system';
+
+                                return (
+                                    <div key={state.logs.length - i} className={`game-log-entry ${logType}`}>
+                                        <span className="log-number">#{state.logs.length - i}</span>
+                                        <span className="log-text">{log}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className={`player-panel right ${!showPlayers ? 'collapsed' : ''}`}>
@@ -1560,6 +1596,42 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                     </div>
                 </div>
             )}
+
+            {/* Game Logs Panel */}
+            <div className="game-logs-panel">
+                <button
+                    className={`game-logs-toggle ${showLogs ? 'expanded' : ''}`}
+                    onClick={() => setShowLogs(!showLogs)}
+                >
+                    <span className="log-icon">📜</span>
+                    <span>Game Logs</span>
+                    <span className="log-count">{state.logs.length}</span>
+                    <span className="toggle-arrow">{showLogs ? '▼' : '▲'}</span>
+                </button>
+                {showLogs && (
+                    <div className="game-logs-content">
+                        <div className="game-logs-header">Recent Activity</div>
+                        {state.logs.slice(-25).reverse().map((log, i) => {
+                            // Detect log type for color coding
+                            let logType = '';
+                            if (log.includes('took tokens')) logType = 'log-tokens';
+                            else if (log.includes('recruited')) logType = 'log-recruit';
+                            else if (log.includes('reserved')) logType = 'log-reserve';
+                            else if (log.includes('location')) logType = 'log-location';
+                            else if (log.includes('Avengers')) logType = 'log-avengers';
+                            else if (log.includes('passed')) logType = 'log-pass';
+                            else if (log.includes('initialized') || log.includes('triggered') || log.includes('aborted')) logType = 'log-system';
+
+                            return (
+                                <div key={state.logs.length - i} className={`game-log-entry ${logType}`}>
+                                    <span className="log-number">#{state.logs.length - i}</span>
+                                    <span className="log-text">{log}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
 
             {/* Victory Screen */}
             {state.status === 'GAME_OVER' && (

@@ -223,7 +223,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             const newPlayers = [...state.players];
             newPlayers[playerIndex] = player;
 
-            let newStateLogs = [...state.logs, `${player.name} recruited ${card.points}pt card.`];
+            let newStateLogs = [...state.logs, `${player.name} recruited ${card.name || 'a card'} (${card.points}pt).`];
             let avengersTileOwnerId = state.avengersTileOwnerId;
 
             // --- Avengers Assemble Tile Mechanic ---
@@ -320,7 +320,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 tokens: newTokens,
                 market: newMarket,
                 decks: newDecks,
-                logs: [...state.logs, `${player.name} reserved a card.`]
+                logs: [...state.logs, `${player.name} reserved ${card.name || 'a card'}.`]
             };
             return processEndTurn({ ...stateWithReserve, lastActionAt: Date.now() });
         }

@@ -1151,3 +1151,182 @@ body {
     font-size: 1rem !important;
   }
 }
+
+/* ============================================
+   GAME LOGS PANEL
+   ============================================ */
+
+.game-logs-panel {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  max-width: calc(100vw - 20px);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.game-logs-toggle {
+  background: rgba(15, 20, 35, 0.95);
+  border: 1px solid rgba(100, 150, 255, 0.3);
+  border-radius: 8px;
+  color: #8ecae6;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+}
+
+.game-logs-toggle:hover {
+  background: rgba(25, 35, 55, 0.95);
+  border-color: rgba(100, 150, 255, 0.5);
+}
+
+.game-logs-toggle.expanded {
+  border-radius: 8px 8px 0 0;
+  border-bottom: none;
+}
+
+.game-logs-toggle .log-icon {
+  font-size: 1rem;
+}
+
+.game-logs-toggle .log-count {
+  background: rgba(100, 150, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  color: #64b5f6;
+}
+
+.game-logs-toggle .toggle-arrow {
+  margin-left: auto;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.game-logs-content {
+  background: rgba(10, 15, 25, 0.98);
+  border: 1px solid rgba(100, 150, 255, 0.3);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  backdrop-filter: blur(8px);
+}
+
+.game-logs-header {
+  position: sticky;
+  top: 0;
+  background: rgba(20, 30, 50, 0.95);
+  padding: 6px 10px;
+  font-size: 0.65rem;
+  color: #666;
+  border-bottom: 1px solid rgba(100, 150, 255, 0.15);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.game-log-entry {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #b8c5d6;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.game-log-entry:last-child {
+  border-bottom: none;
+}
+
+.game-log-entry .log-number {
+  color: #555;
+  font-size: 0.65rem;
+  min-width: 20px;
+  text-align: right;
+}
+
+.game-log-entry .log-text {
+  flex: 1;
+}
+
+/* Log highlighting for different events */
+.game-log-entry.log-tokens {
+  border-left: 3px solid var(--marvel-yellow);
+}
+
+.game-log-entry.log-recruit {
+  border-left: 3px solid var(--marvel-green);
+}
+
+.game-log-entry.log-reserve {
+  border-left: 3px solid var(--marvel-blue);
+}
+
+.game-log-entry.log-location {
+  border-left: 3px solid var(--marvel-purple);
+}
+
+.game-log-entry.log-avengers {
+  border-left: 3px solid gold;
+  background: rgba(255, 215, 0, 0.05);
+}
+
+.game-log-entry.log-pass {
+  border-left: 3px solid #666;
+  color: #888;
+}
+
+.game-log-entry.log-system {
+  border-left: 3px solid var(--marvel-blue);
+  color: #64b5f6;
+  font-style: italic;
+}
+
+/* Remove focus outline */
+.game-logs-toggle:focus {
+  outline: none;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+
+  /* Hide the fixed logs panel on mobile */
+  .game-logs-panel {
+    display: none;
+  }
+
+  /* Style the inline mobile logs */
+  .mobile-inline-logs {
+    margin: 10px 5px 20px 5px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobile-inline-logs .game-logs-toggle {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  .mobile-inline-logs .game-logs-content {
+    max-height: 200px;
+  }
+
+  .mobile-inline-logs .game-log-entry {
+    padding: 6px 10px;
+    font-size: 0.7rem;
+  }
+
+  .mobile-inline-logs .game-log-entry .log-number {
+    display: none;
+  }
+}
