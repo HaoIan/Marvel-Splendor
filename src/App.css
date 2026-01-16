@@ -250,6 +250,12 @@ body {
   gap: 1rem;
 }
 
+/* Placeholder when deck is empty */
+.empty-deck-placeholder {
+  width: 120px;
+  height: 168px;
+}
+
 .locations-row {
   display: flex;
   gap: 2vw;
@@ -801,6 +807,13 @@ body {
     font-weight: bold;
   }
 
+  /* Empty deck placeholder - matches deck-count size */
+  .empty-deck-placeholder {
+    width: 35px !important;
+    min-width: 35px;
+    height: calc(((100vw - 63px) / 5) * 1.4) !important;
+  }
+
   /* ============================================
      PLAYER BAR: Collapsible Footer (60px)
      ============================================ */
@@ -1157,15 +1170,8 @@ body {
    ============================================ */
 
 .game-logs-panel {
-  position: fixed;
-  bottom: 10px;
-  left: 10px;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  width: 320px;
-  max-width: calc(100vw - 20px);
-  font-family: 'Inter', system-ui, sans-serif;
+  display: none;
+  /* Hidden - use inline logs instead */
 }
 
 .game-logs-toggle {
@@ -1297,6 +1303,33 @@ body {
   outline: none;
 }
 
+/* Inline logs container - at bottom of board */
+.inline-logs {
+  margin: 15px 10px 20px 10px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  max-width: 400px;
+}
+
+/* Desktop: expanded content goes upward as overlay */
+.inline-logs .game-logs-content {
+  position: absolute;
+  bottom: 100%;
+  /* Position above the toggle button */
+  left: 0;
+  right: 0;
+  max-height: 300px;
+  border-radius: 8px 8px 0 0;
+  border-bottom: none;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.inline-logs .game-logs-toggle.expanded {
+  border-radius: 0 0 8px 8px;
+  border-top: none;
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
 
@@ -1305,28 +1338,42 @@ body {
     display: none;
   }
 
-  /* Style the inline mobile logs */
-  .mobile-inline-logs {
+  /* Mobile: inline logs expand downward in flow (not upward overlay) */
+  .inline-logs {
     margin: 10px 5px 20px 5px;
-    display: flex;
-    flex-direction: column;
+    max-width: none;
   }
 
-  .mobile-inline-logs .game-logs-toggle {
+  .inline-logs .game-logs-content {
+    position: static;
+    /* Reset to normal flow */
+    max-height: 200px;
+    border-radius: 0 0 8px 8px;
+    border-top: none;
+    box-shadow: none;
+  }
+
+  .inline-logs .game-logs-toggle.expanded {
+    border-radius: 8px 8px 0 0;
+    border-bottom: none;
+  }
+
+  .inline-logs .game-logs-toggle {
     padding: 8px 12px;
     font-size: 0.8rem;
   }
 
-  .mobile-inline-logs .game-logs-content {
-    max-height: 200px;
-  }
-
-  .mobile-inline-logs .game-log-entry {
+  .inline-logs .game-log-entry {
     padding: 6px 10px;
     font-size: 0.7rem;
   }
 
-  .mobile-inline-logs .game-log-entry .log-number {
+  .inline-logs .game-log-entry .log-number {
     display: none;
+  }
+
+  /* Flip arrow direction on mobile since logs expand downward */
+  .inline-logs .toggle-arrow {
+    transform: rotate(180deg);
   }
 }

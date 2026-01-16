@@ -1198,8 +1198,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                     }}>
                                     </div>
                                 ) : (
-                                    <div style={{ width: '120px', height: '168px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    </div>
+                                    <div className="empty-deck-placeholder"></div>
                                 )}
                             </div>
 
@@ -1217,8 +1216,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                     ))}
                 </div>
 
-                {/* Mobile Inline Logs - at bottom of board content */}
-                <div className="mobile-inline-logs mobile-only">
+                {/* Inline Logs - at bottom of board content */}
+                <div className="inline-logs">
                     <button
                         className={`game-logs-toggle ${showLogs ? 'expanded' : ''}`}
                         onClick={() => setShowLogs(!showLogs)}
@@ -1226,7 +1225,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                         <span className="log-icon">📜</span>
                         <span>Game Logs</span>
                         <span className="log-count">{state.logs.length}</span>
-                        <span className="toggle-arrow">{showLogs ? '▲' : '▼'}</span>
+                        <span className="toggle-arrow">{showLogs ? '▼' : '▲'}</span>
                     </button>
                     {showLogs && (
                         <div className="game-logs-content">
@@ -1606,7 +1605,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                     <span className="log-icon">📜</span>
                     <span>Game Logs</span>
                     <span className="log-count">{state.logs.length}</span>
-                    <span className="toggle-arrow">{showLogs ? '▼' : '▲'}</span>
+                    <span className="toggle-arrow">{showLogs ? '▲' : '▼'}</span>
                 </button>
                 {showLogs && (
                     <div className="game-logs-content">
