@@ -594,31 +594,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
     // Animate Locations entering the board (Start of Game)
     React.useLayoutEffect(() => {
-        const currentLocations = state.locations || [];
-        const prevLocations = prevLocationsRef.current;
-
-        // Find new locations (Check ID AND Image to handle random seed mismatches/resyncs)
-        const newLocations = currentLocations.filter(loc =>
-            !prevLocations.some(pl => pl.id === loc.id && pl.image === loc.image)
-        );
-
-        newLocations.forEach((loc, index) => {
-            const startId = 'deck-tier-3'; // Fly from top deck
-            const targetId = `location-tile-${loc.id}`;
-
-            // Hide real location
-            setHiddenCardIds(prev => new Set(prev).add(loc.id));
-
-            // Stagger animations
-            setTimeout(() => {
-                requestAnimationFrame(() => {
-                    // Use card type for flying tile
-                    triggerAnimation('card', loc.image, startId, targetId, undefined, loc.id);
-                });
-            }, index * 200 + 500); // Initial delay + stagger
-        });
-
-        prevLocationsRef.current = currentLocations;
+        // No animation for locations to match Avenger tile behavior
+        prevLocationsRef.current = state.locations || [];
     }, [state.locations]);
 
     const triggerAnimation = (type: 'token' | 'card', content: string, startId: string, endId: string, backContent?: string, relatedCardId?: string) => {
