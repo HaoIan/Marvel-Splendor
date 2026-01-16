@@ -105,30 +105,16 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: {
         >
             <div className="card-header">
                 <span className="card-points">{card.points || ''}</span>
-                {card.avengersTag !== undefined && card.avengersTag > 0 && Array.from({ length: card.avengersTag }).map((_, i) => (
-                    <div key={`avenger-tag-${i}`} style={{
-                        position: 'absolute', top: '4px', right: (card.tier === 3 ? 25 : 6) + (i * 20) + 'px',
-                        width: '18px', height: '18px', borderRadius: '50%',
-                        background: 'linear-gradient(135deg, darkgray, black)',
-                        boxShadow: '0 0 3px black',
-                        border: '1px solid white',
-                        color: 'white', fontSize: '12px', fontWeight: 'bold',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        zIndex: 2
-                    }} title="Avengers Tag">
-                        A
-                    </div>
-                ))}
-                {card.tier === 3 && (
-                    <div style={{
-                        position: 'absolute', top: '5px', right: '5px',
-                        width: '15px', height: '15px', borderRadius: '50%',
-                        background: 'radial-gradient(circle at 30% 30%, #aaffaa, #00aa00)',
-                        boxShadow: '0 0 5px #00ff00',
-                        border: '1px solid #fff',
-                        zIndex: 2
-                    }} title="Grants Time Stone (Green)"></div>
-                )}
+                <div className="card-indicators">
+                    {card.avengersTag !== undefined && card.avengersTag > 0 && Array.from({ length: card.avengersTag }).map((_, i) => (
+                        <div key={`avenger-tag-${i}`} className="avengers-tag" title="Avengers Tag">
+                            A
+                        </div>
+                    ))}
+                    {card.tier === 3 && (
+                        <div className="time-stone-indicator" title="Grants Time Stone (Green)"></div>
+                    )}
+                </div>
             </div>
             <div className="card-cost">
                 {Object.entries(card.cost).map(([color, amt]) => (
