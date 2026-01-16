@@ -405,6 +405,19 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
 
             if (state.status === 'GAME_OVER') return state;
 
+            // Start Auto-Resolution Logic
+            if (state.pendingLocationSelection && state.pendingLocationSelection.length > 0) {
+                // If timed out during location selection, auto-select the first one.
+                const firstLoc = state.pendingLocationSelection[0];
+                const player = state.players[state.currentPlayerIndex];
+
+                console.log(`Auto-selecting location ${firstLoc.name} for ${player.name} due to timeout.`);
+
+                // Recursively call reducer to simulate selection
+                return gameReducer(state, { type: 'SELECT_LOCATION', locationId: firstLoc.id });
+            }
+            // End Auto-Resolution Logic
+
             const player = state.players[state.currentPlayerIndex];
             const newState = {
                 ...state,
