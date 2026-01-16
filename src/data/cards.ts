@@ -1,5 +1,13 @@
 import type { Card, GemColor, Cost } from '../types';
 
+// Import card art that is in src/assets
+import valkyrieImg from '../assets/card-art/Valkyrie.jpg';
+import quakeImg from '../assets/card-art/Quake.webp';
+import chavezImg from '../assets/card-art/chavez.png';
+import mariaHillImg from '../assets/card-art/mariahill.png';
+import shuriImg from '../assets/card-art/shuri.webp';
+import okoyeImg from '../assets/card-art/okoye.png';
+
 // Mapping Standard Splendor -> Marvel Splendor
 // White -> Yellow (Mind)
 // Blue -> Blue (Space)
@@ -48,7 +56,7 @@ export const INITIAL_DECK: Card[] = [
     createCard('1_05', 1, 1, 'blue', [0, 0, 0, 4, 0], "Agent Bob", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/10-agent-bob.jpg"),
     createCard('1_06', 1, 0, 'blue', [1, 0, 1, 2, 1], "Agent Zero", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/11-agent-zero.jpg"),
     createCard('1_07', 1, 0, 'blue', [1, 0, 2, 2, 0], "Wasp", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/708-wasp.jpg", 1),
-    createCard('1_08', 1, 0, 'blue', [0, 1, 3, 1, 0], "Valkyrie", "src/assets/card-art/Valkyrie.jpg", 1),
+    createCard('1_08', 1, 0, 'blue', [0, 1, 3, 1, 0], "Valkyrie", valkyrieImg, 1),
 
     createCard('1_09', 1, 0, 'red', [0, 2, 1, 0, 0], "Angel Dust", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/25-angel-dust.jpg"),
     createCard('1_10', 1, 0, 'red', [3, 0, 0, 0, 0], "Annihilus", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/29-annihilus.jpg"),
@@ -57,7 +65,7 @@ export const INITIAL_DECK: Card[] = [
     createCard('1_13', 1, 1, 'red', [4, 0, 0, 0, 0], "Mysterio", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/479-mysterio.jpg"),
     createCard('1_14', 1, 0, 'red', [2, 1, 1, 0, 1], "Arclight", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/41-arclight.jpg"),
     createCard('1_15', 1, 0, 'red', [2, 0, 1, 0, 2], "Ms Marvel", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/477-ms-marvel-ii.jpg", 1),
-    createCard('1_16', 1, 0, 'red', [1, 0, 0, 1, 3], "Quake", "src/assets/card-art/Quake.webp", 1),
+    createCard('1_16', 1, 0, 'red', [1, 0, 0, 1, 3], "Quake", quakeImg, 1),
 
     createCard('1_17', 1, 0, 'orange', [2, 1, 0, 0, 0], "Ariel", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/44-ariel.jpg"),
     createCard('1_18', 1, 0, 'orange', [0, 0, 0, 3, 0], "Armor", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/45-armor.jpg"),
@@ -84,7 +92,7 @@ export const INITIAL_DECK: Card[] = [
     createCard('1_37', 1, 1, 'purple', [0, 4, 0, 0, 0], "Blackwing", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/110-blackwing.jpg"),
     createCard('1_38', 1, 0, 'purple', [1, 2, 1, 1, 0], "Blackwulf", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/111-blackwulf.jpg"),
     createCard('1_39', 1, 0, 'purple', [2, 2, 0, 1, 0], "Winter Soldier", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/714-winter-soldier.jpg", 1),
-    createCard('1_40', 1, 0, 'purple', [0, 0, 1, 3, 1], "America Chavez", "src/assets/card-art/chavez.png", 1),
+    createCard('1_40', 1, 0, 'purple', [0, 0, 1, 3, 1], "America Chavez", chavezImg, 1),
 
     // --- LEVEL 2 (Total 30) ---
     createCard('2_01', 2, 2, 'blue', [0, 0, 5, 0, 0], "Blink", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/115-blink.jpg"),
@@ -110,16 +118,16 @@ export const INITIAL_DECK: Card[] = [
 
     createCard('2_19', 2, 2, 'yellow', [0, 0, 0, 5, 0], "Copycat", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/186-copycat.jpg"),
     createCard('2_20', 2, 3, 'yellow', [6, 0, 0, 0, 0], "Cottonmouth", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/188-cottonmouth.jpg"),
-    createCard('2_21', 2, 1, 'yellow', [0, 0, 3, 2, 2], "Maria Hill", "src/assets/card-art/mariahill.png", 1),
+    createCard('2_21', 2, 1, 'yellow', [0, 0, 3, 2, 2], "Maria Hill", mariaHillImg, 1),
     createCard('2_22', 2, 2, 'yellow', [0, 0, 1, 4, 2], "Cyclops", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/196-cyclops.jpg"),
-    createCard('2_23', 2, 1, 'yellow', [2, 3, 0, 3, 0], "Shuri", "src/assets/card-art/shuri.webp", 1),
+    createCard('2_23', 2, 1, 'yellow', [2, 3, 0, 3, 0], "Shuri", shuriImg, 1),
     createCard('2_24', 2, 2, 'yellow', [0, 0, 0, 5, 3], "Daredevil", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/201-daredevil.jpg"),
 
     createCard('2_25', 2, 2, 'purple', [0, 0, 0, 0, 5], "Darkhawk", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/202-darkhawk.jpg"),
     createCard('2_26', 2, 3, 'purple', [0, 0, 0, 6, 0], "Darkstar", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/206-darkstar.jpg"),
     createCard('2_27', 2, 1, 'purple', [2, 0, 0, 2, 3], "She-Hulk", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/589-she-hulk.jpg", 1),
     createCard('2_28', 2, 2, 'purple', [1, 4, 2, 0, 0], "Deathlok", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/215-deathlok.jpg"),
-    createCard('2_29', 2, 1, 'purple', [0, 3, 0, 2, 3], "Okoye", "src/assets/card-art/okoye.png", 1),
+    createCard('2_29', 2, 1, 'purple', [0, 3, 0, 2, 3], "Okoye", okoyeImg, 1),
     createCard('2_30', 2, 2, 'purple', [3, 0, 0, 0, 5], "Destroyer", "https://cdn.jsdelivr.net/gh/akabab/superhero-api@0.3.0/api/images/md/218-destroyer.jpg"),
 
     // --- LEVEL 3 (Total 20) ---

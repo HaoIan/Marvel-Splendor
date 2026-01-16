@@ -73,7 +73,7 @@ const Token = ({ color, count, onClick, size = 100, style }: { color: keyof Toke
 );
 
 const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: { card: CardType, onClick: () => void, disabled?: boolean, canAfford?: boolean, noAnimate?: boolean, hideName?: boolean }) => {
-    const bgImage = card.imageUrl || `/assets/hero-tier-${card.tier}.png`;
+    const bgImage = card.imageUrl || `${import.meta.env.BASE_URL}assets/hero-tier-${card.tier}.png`;
     const [animate, setAnimate] = useState(!noAnimate);
     const [animDelay, setAnimDelay] = useState('0s');
 
@@ -573,7 +573,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 const deckId = `deck-tier-${tier}`;
                 const cardId = `market-card-${card.id}`;
                 // For flip animation: content = front face, backContent = card back
-                const frontImage = card.imageUrl || `/assets/hero-tier-${card.tier}.png`;
+                const frontImage = card.imageUrl || `${import.meta.env.BASE_URL}assets/hero-tier-${card.tier}.png`;
 
                 // Hide the real card immediately (synchronously before paint)
                 setHiddenCardIds(prev => new Set(prev).add(card.id));
