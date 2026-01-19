@@ -27,7 +27,7 @@ function App() {
 		});
 	}, []);
 
-	const { state, dispatch, mpState, hostGame, joinGame, closeLobby } = useGameEngine(playerUUID);
+	const { state, dispatch, mpState, hostGame, joinGame, closeLobby, leaveGame } = useGameEngine(playerUUID);
 	const [remoteId, setRemoteId] = useState('');
 	const [playerName, setPlayerName] = useState('');
 	const [turnLimit, setTurnLimit] = useState(60);
@@ -300,6 +300,52 @@ function App() {
 						) : (
 							<p>Waiting for host to start...</p>
 						)}
+
+						<div style={{ marginTop: '30px', borderTop: '1px solid #444', paddingTop: '20px' }}>
+							{mpState.isHost ? (
+								<button
+									style={{
+										background: 'rgba(255, 0, 0, 0.2)',
+										color: '#ff4444',
+										border: '1px solid #ff4444',
+										padding: '8px 16px',
+										borderRadius: '4px',
+										cursor: 'pointer',
+										fontSize: '0.9rem'
+									}}
+									onClick={(e) => {
+										const btn = e.currentTarget;
+										if (btn.innerText === "Confirm Close?") {
+											closeLobby();
+										} else {
+											btn.innerText = "Confirm Close?";
+											setTimeout(() => btn.innerText = "Close Lobby", 3000);
+										}
+									}}
+								>
+									Close Lobby
+								</button>
+							) : (
+								<button
+									style={{
+										background: 'rgba(255, 0, 0, 0.2)',
+										color: '#ff4444',
+										border: '1px solid #ff4444',
+										padding: '8px 16px',
+										borderRadius: '4px',
+										cursor: 'pointer',
+										fontSize: '0.9rem'
+									}}
+									onClick={() => {
+										if (window.confirm("Are you sure you want to leave the game?")) {
+											leaveGame();
+										}
+									}}
+								>
+									Leave Game
+								</button>
+							)}
+						</div>
 					</div>
 				</div>
 			) : (

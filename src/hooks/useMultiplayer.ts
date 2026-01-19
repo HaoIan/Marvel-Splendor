@@ -228,10 +228,45 @@ export const useMultiplayer = (
         if (mpState.isHost && mpState.gameId) {
             // Host Aborts
             const abortedState = { ...gameStateRef.current, status: 'ABORTED' };
-            await supabase.from('matches').update({ game_state: abortedState }).eq('id', mpState.gameId);
+            const { error } = await supabase.from('matches').update({ game_state: abortedState }).eq('id', mpState.gameId);
+            if (error) {
+                console.error("Error closing lobby:", error);
+                alert("Failed to close lobby: " + error.message);
+                return;
+            }
         }
 
         // Clear local and reload
+        setMpState({ playerId: null, gameId: null, connectionStatus: 'idle', isHost: false });
+        localStorage.removeItem('splendor_gameId');
+        localStorage.removeItem('splendor_isHost');
+        window.location.reload();
+    };
+
+    const leaveGame = async () => {
+        if (!mpState.gameId || !mpState.playerId) return;
+
+        // 1. Get current state
+        const { data, error } = await supabase
+            .from('matches')
+            .select('game_state')
+            .eq('id', mpState.gameId)
+            .single();
+
+        if (data && !error) {
+            const currentState = data.game_state as GameState;
+            // 2. Remove player
+            const updatedPlayers = currentState.players.filter(p => p.id !== mpState.playerId);
+            const updatedState = { ...currentState, players: updatedPlayers };
+
+            // 3. Update DB
+            await supabase
+                .from('matches')
+                .update({ game_state: updatedState })
+                .eq('id', mpState.gameId);
+        }
+
+        // 4. Clear local
         setMpState({ playerId: null, gameId: null, connectionStatus: 'idle', isHost: false });
         localStorage.removeItem('splendor_gameId');
         localStorage.removeItem('splendor_isHost');
@@ -243,6 +278,7 @@ export const useMultiplayer = (
         hostGame,
         joinGame,
         sendAction,
-        closeLobby
+        closeLobby,
+        leaveGame
     };
 };

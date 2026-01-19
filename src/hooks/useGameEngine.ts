@@ -23,7 +23,7 @@ export const useGameEngine = (playerUUID?: string) => {
     }, [state]);
 
     // Custom dispatch wrapper to handle forwarding actions to Host if we are Client
-    const { mpState, hostGame, joinGame, sendAction, closeLobby } = useMultiplayer(dispatch, state, playerUUID);
+    const { mpState, hostGame, joinGame, sendAction, closeLobby, leaveGame } = useMultiplayer(dispatch, state, playerUUID);
 
     const matchDispatch = (action: GameAction) => {
         // If we are connected to a game, we always "Send" the action.
@@ -42,6 +42,7 @@ export const useGameEngine = (playerUUID?: string) => {
         mpState,
         hostGame,
         joinGame,
-        closeLobby
+        closeLobby,
+        leaveGame
     };
 };
