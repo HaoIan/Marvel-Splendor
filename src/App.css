@@ -716,10 +716,23 @@ body {
      ============================================ */
   .locations-row {
     display: flex;
-    justify-content: center;
-    gap: 6px;
-    padding: 4px 0;
+    justify-content: flex-start;
+    /* Alignment start for scrolling */
+    gap: 8px;
+    padding: 0 10px;
+    /* Side padding */
     flex-shrink: 0;
+    overflow-x: auto;
+    /* Enable scrolling */
+    width: 100%;
+    /* Ensure container takes width */
+    scrollbar-width: none;
+    /* Hide scrollbar Firefox */
+  }
+
+  .locations-row::-webkit-scrollbar {
+    display: none;
+    /* Hide scrollbar Chrome/Safari */
   }
 
   .locations-row .card.location {
