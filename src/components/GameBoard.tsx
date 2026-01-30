@@ -444,6 +444,37 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 // Usually the Host should do it if active player is away, or the active player themselves.
                 // Fail-safe: Everyone sends attempts, server syncs the first one.
 
+                // Auto-Collect Logic
+                // If it's MY turn and I have selected tokens that are valid, auto-confirm them.
+                if (isMyTurn && Object.keys(selectedTokensRef.current).length > 0) {
+                    const player = state.players[state.currentPlayerIndex];
+                    const currentTotal = Object.values(player.tokens).reduce((a, b) => a + b, 0);
+                    const selectedCount = Object.values(selectedTokensRef.current).reduce((a, b) => a + b, 0);
+
+                    if (currentTotal + selectedCount <= 10) {
+                        // Valid move! Auto-take.
+                        dispatch({
+                            type: 'TAKE_TOKENS',
+                            tokens: { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0, green: 0, gray: 0, ...selectedTokensRef.current }
+                        });
+
+                        // Trigger Animations (Replicated logic)
+                        const playerId = player.id;
+                        Object.entries(selectedTokensRef.current).forEach(([color, count]) => {
+                            if (count && count > 0) {
+                                for (let i = 0; i < count; i++) {
+                                    setTimeout(() => {
+                                        triggerAnimation('token', TOKEN_IMAGES[color], `token-bank-${color}`, `player-area-${playerId}`);
+                                    }, i * 100);
+                                }
+                            }
+                        });
+                        playTokenSound();
+                        setSelectedTokens({}); // Clear local state
+                        return; // Skip PASS_TURN
+                    }
+                }
+
                 // Only dispatch if we haven't received a new turn status yet (which we haven't if deadine is old)
                 dispatch({ type: 'PASS_TURN', expectedPlayerIndex: state.currentPlayerIndex });
             }
@@ -461,6 +492,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
 
     const [selectedTokens, setSelectedTokens] = useState<Partial<TokenBank>>({});
+    const selectedTokensRef = useRef(selectedTokens);
+    useEffect(() => {
+        selectedTokensRef.current = selectedTokens;
+    }, [selectedTokens]);
     const [selectedCard, setSelectedCard] = useState<CardType | null>(null); // For Modal
     const [animations, setAnimations] = useState<AnimationItem[]>([]);
     const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
