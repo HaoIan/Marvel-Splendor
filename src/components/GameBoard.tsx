@@ -592,7 +592,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
         const startRect = startEl.getBoundingClientRect();
 
-
         // Calculate a centered target rect to avoid expanding to the full container size
         // If animating to market (endId includes 'market-card'), use full size (120x168)
         // If animating to location (endId includes 'location-tile'), use full size (130x130)
@@ -607,7 +606,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             if (inner) realEndEl = inner as HTMLElement;
         }
 
-        const rect = realEndEl.getBoundingClientRect();
+        let rect = realEndEl.getBoundingClientRect();
+
+        // Fallback for hidden elements (mobile player panel collapsed)
+        if (rect.width === 0 && rect.height === 0) {
+            const fallbackEl = document.getElementById('mobile-player-summary-bar');
+            if (fallbackEl) {
+                rect = fallbackEl.getBoundingClientRect();
+            }
+        }
 
         let targetWidth: number;
         let targetHeight: number;
@@ -1240,7 +1247,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
             <div className={`player-panel right ${!showPlayers ? 'collapsed' : ''}`}>
                 {/* Mobile Player Summary Bar - Always visible */}
-                <div className="mobile-player-summary mobile-only">
+                <div id="mobile-player-summary-bar" className="mobile-player-summary mobile-only">
                     <div className="player-info">
                         <span className="player-name" style={{
                             color: viewingPlayer.id === state.players[state.currentPlayerIndex].id ? 'var(--marvel-green)' : 'white'
