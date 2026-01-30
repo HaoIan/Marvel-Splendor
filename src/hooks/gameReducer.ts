@@ -128,11 +128,25 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             const newPlayers = [...state.players];
             newPlayers[playerIndex] = player;
 
+            const takenDetails: string[] = [];
+            let double = false;
+            (Object.keys(taken) as (keyof TokenBank)[]).forEach(k => {
+                if (taken[k] > 0) {
+                    if (taken[k] === 2) {
+                        double = true;
+                    }
+                    // Capitalize first letter
+                    const colorName = k.charAt(0).toUpperCase() + k.slice(1);
+                    takenDetails.push(`${taken[k]} ${colorName}`);
+                }
+            });
+            const tokenString = takenDetails.join(', ');
+
             const stateWithTokens = {
                 ...state,
                 tokens: newTokens,
                 players: newPlayers,
-                logs: [...state.logs, `${player.name} took tokens.`]
+                logs: [...state.logs, `${player.name} took ${tokenString} ${double ? 'tokens' : 'token'}.`]
             };
 
             return processEndTurn({ ...stateWithTokens, lastActionAt: Date.now() });
