@@ -519,14 +519,31 @@ const advanceTurn = (state: GameState): GameState => {
             // Determine Winner
             // Tie-breaker: Most points -> Fewest Development Cards (Tableau size)
             const sortedPlayers = [...nextState.players].sort((a, b) => {
+                // 1. Most Points
                 if (b.points !== a.points) return b.points - a.points;
-                return a.tableau.length - b.tableau.length; // Fewer cards is better
+
+                // 2. Avengers Tile Owner (Wins tie)
+                if (nextState.avengersTileOwnerId) {
+                    if (a.id === nextState.avengersTileOwnerId) return -1;
+                    if (b.id === nextState.avengersTileOwnerId) return 1;
+                }
+
+                // 3. Fewest Development Cards (Tableau size)
+                return a.tableau.length - b.tableau.length;
             });
 
-            const winners = sortedPlayers.filter(p =>
-                p.points === sortedPlayers[0].points &&
-                p.tableau.length === sortedPlayers[0].tableau.length
-            );
+            const winners = sortedPlayers.filter(p => {
+                const topPlayer = sortedPlayers[0];
+                if (p.points !== topPlayer.points) return false;
+
+                // If top player has Avengers tile, they are the unique winner
+                if (nextState.avengersTileOwnerId === topPlayer.id) {
+                    return p.id === topPlayer.id;
+                }
+
+                // Otherwise, check for shared fewest cards
+                return p.tableau.length === topPlayer.tableau.length;
+            });
 
             const winnerNames = winners.map(p => p.name).join(' & ');
 
