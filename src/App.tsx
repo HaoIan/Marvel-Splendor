@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase, signInAnonymously } from './lib/supabase';
+import { Routes, Route, Link } from 'react-router-dom';
+import { supabase, signInAnonymously, signUpWithEmail, signInWithEmail, signOutUser, linkAnonymousToEmail, isAnonymousUser } from './lib/supabase';
+import { getProfile, type Profile } from './lib/profileService';
 import './App.css';
 import { useGameEngine } from './hooks/useGameEngine';
 import { GameBoard } from './components/GameBoard';
+import { Leaderboard } from './components/Leaderboard';
 
 function App() {
 	// Identity logic
@@ -43,7 +46,107 @@ function App() {
 
 	const myPlayerId = isLocal ? null : mpState.playerId;
 
+	// Auth state for optional sign-up/login
+	const [isRegistered, setIsRegistered] = useState(false);
+	const [profile, setProfile] = useState<Profile | null>(null);
+	const [showAuthPanel, setShowAuthPanel] = useState(false);
+	const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+	const [authEmail, setAuthEmail] = useState('');
+	const [authPassword, setAuthPassword] = useState('');
+	const [authDisplayName, setAuthDisplayName] = useState('');
+	const [authError, setAuthError] = useState('');
+	const [authLoading, setAuthLoading] = useState(false);
 
+	// Check if current user is registered on load
+	useEffect(() => {
+		if (!playerUUID) return;
+		isAnonymousUser().then(isAnon => {
+			if (!isAnon) {
+				setIsRegistered(true);
+				getProfile(playerUUID).then(p => {
+					if (p) {
+						setProfile(p);
+						if (!playerName) setPlayerName(p.display_name);
+					}
+				});
+			}
+		});
+	}, [playerUUID]);
+
+	const handleSignUp = async () => {
+		if (!authEmail.trim() || !authPassword.trim() || !authDisplayName.trim()) {
+			setAuthError('Please fill in all fields.');
+			return;
+		}
+		setAuthLoading(true);
+		setAuthError('');
+
+		const isAnon = await isAnonymousUser();
+		if (isAnon && playerUUID) {
+			const { success, error } = await linkAnonymousToEmail(authEmail, authPassword, authDisplayName);
+			if (error) {
+				setAuthError(error);
+				setAuthLoading(false);
+				return;
+			}
+			if (success) {
+				setIsRegistered(true);
+				const p = await getProfile(playerUUID);
+				setProfile(p);
+				setPlayerName(authDisplayName);
+				setShowAuthPanel(false);
+			}
+		} else {
+			const { userId, error } = await signUpWithEmail(authEmail, authPassword, authDisplayName);
+			if (error) {
+				setAuthError(error);
+				setAuthLoading(false);
+				return;
+			}
+			if (userId) {
+				setPlayerUUID(userId);
+				setIsRegistered(true);
+				const p = await getProfile(userId);
+				setProfile(p);
+				setPlayerName(authDisplayName);
+				setShowAuthPanel(false);
+			}
+		}
+		setAuthLoading(false);
+	};
+
+	const handleSignIn = async () => {
+		if (!authEmail.trim() || !authPassword.trim()) {
+			setAuthError('Please enter email and password.');
+			return;
+		}
+		setAuthLoading(true);
+		setAuthError('');
+		const { userId, error } = await signInWithEmail(authEmail, authPassword);
+		if (error) {
+			setAuthError(error);
+			setAuthLoading(false);
+			return;
+		}
+		if (userId) {
+			setPlayerUUID(userId);
+			setIsRegistered(true);
+			const p = await getProfile(userId);
+			setProfile(p);
+			if (p) setPlayerName(p.display_name);
+			setShowAuthPanel(false);
+		}
+		setAuthLoading(false);
+	};
+
+	const handleSignOut = async () => {
+		await signOutUser();
+		setIsRegistered(false);
+		setProfile(null);
+		setPlayerName('');
+		const id = await signInAnonymously();
+		if (id) setPlayerUUID(id);
+	};
 
 	// Show Game if:
 	// 1. We are playing locally (isLocal)
@@ -78,287 +181,371 @@ function App() {
 	};
 
 	return (
-		<div className="App">
-			{!showGame && !showLobbyBoard ? (
-				<div className="lobby-container">
-					<div className="glass-panel" style={{ textAlign: 'center', maxWidth: '500px' }}>
-						<h1 style={{ fontFamily: 'Impact', letterSpacing: '2px', background: 'linear-gradient(to right, #f00, #fc0)', WebkitBackgroundClip: 'text', color: 'transparent', fontSize: '3rem', margin: '0' }}>
-							MARVEL SPLENDOR
-						</h1>
-						<p style={{ color: '#aaa', marginBottom: '2rem' }}>Because Colonist Sucks!</p>
+		<Routes>
+			<Route path="/leaderboard" element={<Leaderboard />} />
+			<Route path="/" element={
+				<div className="App">
+					{!showGame && !showLobbyBoard ? (
+						<div className="lobby-container">
+							<div className="glass-panel" style={{ textAlign: 'center', maxWidth: '500px' }}>
+								<h1 style={{ fontFamily: 'Impact', letterSpacing: '2px', background: 'linear-gradient(to right, #f00, #fc0)', WebkitBackgroundClip: 'text', color: 'transparent', fontSize: '3rem', margin: '0' }}>
+									MARVEL SPLENDOR
+								</h1>
+								<p style={{ color: '#aaa', marginBottom: '2rem' }}>Because Colonist Sucks!</p>
 
-						<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-							<div style={{ borderBottom: '1px solid #444', paddingBottom: '1rem', marginBottom: '1rem' }}>
-								<h3>Online Multiplayer</h3>
+								{/* Account Status Bar */}
+								{isRegistered && profile ? (
+									<div className="auth-status-bar">
+										<span className="auth-welcome">
+											<span className="registered-badge">✦</span>
+											{profile.display_name}
+										</span>
+										<span className="auth-stats">{profile.games_won}W / {profile.games_played}G</span>
+										<button onClick={handleSignOut} className="btn-auth-action btn-signout">Sign Out</button>
+									</div>
+								) : (
+									<div style={{ marginBottom: '1rem' }}>
+										<button
+											onClick={() => setShowAuthPanel(!showAuthPanel)}
+											className="btn-auth-toggle"
+										>
+											{showAuthPanel ? 'Hide' : '🔒 Sign Up / Log In'}
+											<span style={{ fontSize: '0.75rem', color: '#888', marginLeft: '6px' }}>(optional)</span>
+										</button>
 
-								{/* Name Input */}
-								<div style={{ marginBottom: '15px' }}>
-									<input
-										type="text"
-										placeholder="Enter Your Name"
-										value={playerName}
-										onChange={(e) => setPlayerName(e.target.value)}
-										style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', width: '100%', boxSizing: 'border-box', textAlign: 'center', fontSize: '1.1rem' }}
-									/>
-								</div>
-
-								{!playerUUID ? (
-									<div style={{ color: '#aaa' }}>Establishing secure connection...</div>
-								) : mpState.connectionStatus === 'idle' || mpState.connectionStatus === 'error' ? (
-									<>
-										{/* Timer Selection */}
-										<div style={{ marginBottom: '20px', color: '#ccc', fontSize: '0.9rem' }}>
-											<label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Turn Timer</label>
-											<div style={{
-												display: 'inline-flex',
-												background: 'rgba(255,255,255,0.05)',
-												borderRadius: '25px',
-												border: '1px solid #444',
-												overflow: 'hidden'
-											}}>
-												{[30, 60, 90, 120, 0].map(val => (
+										{showAuthPanel && (
+											<div className="auth-panel">
+												<div className="auth-tabs">
 													<button
-														key={val}
-														onClick={() => setTurnLimit(val)}
-														style={{
-															padding: '8px 16px',
-															borderRadius: 0,
-															border: 'none',
-															borderRight: '1px solid #555',
-															background: turnLimit === val ? '#4facfe' : 'transparent',
-															color: turnLimit === val ? 'white' : '#aaa',
-															cursor: 'pointer',
-															fontSize: '0.85rem',
-															fontWeight: turnLimit === val ? 'bold' : 'normal',
-															transition: 'all 0.2s',
-															minWidth: '50px'
-														}}
-													>
-														{val === 0 ? "No Timer" : `${val}s`}
-													</button>
-												))}
-
-												<div style={{ position: 'relative', display: 'flex', alignItems: 'center', background: ![30, 60, 90, 120, 0].includes(turnLimit) ? '#4facfe' : 'transparent' }}>
-													<input
-														type="number"
-														min="10"
-														max="600"
-														value={turnLimit}
-														onChange={(e) => setTurnLimit(Math.max(0, parseInt(e.target.value) || 0))}
-														style={{
-															width: '60px',
-															padding: '8px 10px',
-															border: 'none',
-															background: 'transparent',
-															color: ![30, 60, 90, 120, 0].includes(turnLimit) ? 'white' : '#aaa',
-															textAlign: 'center',
-															fontSize: '0.85rem',
-															fontWeight: ![30, 60, 90, 120, 0].includes(turnLimit) ? 'bold' : 'normal',
-															outline: 'none',
-															MozAppearance: 'textfield'
-														}}
-														placeholder="Custom"
-													/>
+														className={`auth-tab ${authMode === 'login' ? 'active' : ''}`}
+														onClick={() => { setAuthMode('login'); setAuthError(''); }}
+													>Log In</button>
+													<button
+														className={`auth-tab ${authMode === 'signup' ? 'active' : ''}`}
+														onClick={() => { setAuthMode('signup'); setAuthError(''); }}
+													>Sign Up</button>
 												</div>
-											</div>
-										</div>
 
-										{formError && (
-											<div style={{ color: '#ff5555', marginBottom: '10px', fontSize: '0.9rem', background: 'rgba(255,0,0,0.1)', padding: '5px', borderRadius: '4px' }}>
-												{formError}
+												{authMode === 'signup' && (
+													<input
+														type="text"
+														placeholder="Display Name"
+														value={authDisplayName}
+														onChange={(e) => setAuthDisplayName(e.target.value)}
+														className="auth-input"
+													/>
+												)}
+												<input
+													type="email"
+													placeholder="Email"
+													value={authEmail}
+													onChange={(e) => setAuthEmail(e.target.value)}
+													className="auth-input"
+												/>
+												<input
+													type="password"
+													placeholder="Password"
+													value={authPassword}
+													onChange={(e) => setAuthPassword(e.target.value)}
+													className="auth-input"
+												/>
+
+												{authError && (
+													<div className="auth-error">{authError}</div>
+												)}
+
+												<button
+													onClick={authMode === 'signup' ? handleSignUp : handleSignIn}
+													className="btn-primary"
+													disabled={authLoading}
+													style={{ width: '100%', opacity: authLoading ? 0.6 : 1 }}
+												>
+													{authLoading ? 'Please wait...' : authMode === 'signup' ? 'Create Account' : 'Log In'}
+												</button>
 											</div>
 										)}
-
-										<button className="btn-primary" onClick={() => {
-											if (playerName.trim()) hostGame(playerName, playerUUID, turnLimit);
-											else setFormError("Please enter your name first!");
-										}}>Create New Game</button>
-										<div style={{ margin: '10px' }}>or</div>
-										<div style={{ display: 'flex', gap: '5px' }}>
-											<input
-												type="text"
-												placeholder="Enter Game Code (UUID)"
-												value={remoteId}
-												onChange={(e) => setRemoteId(e.target.value)}
-												style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', flex: 1 }}
-											/>
-											<button className="btn-primary" onClick={() => {
-												if (remoteId.trim() && playerName.trim()) joinGame(remoteId, playerName, playerUUID);
-												else setFormError("Please enter your name and Game Code!");
-											}}>Join</button>
-										</div>
-									</>
-								) : (
-									<div style={{ animation: 'pulse 2s infinite' }}>Connecting...</div>
-								)}
-
-								{mpState.errorMessage && (
-									<div style={{ marginTop: '10px', color: 'red', background: 'rgba(255,0,0,0.1)', padding: '10px', borderRadius: '5px' }}>
-										<strong>Error:</strong> {mpState.errorMessage}
-										<br />
-										<small onClick={() => window.location.reload()} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Reset</small>
 									</div>
 								)}
-							</div>
 
-							<div>
-								<button style={{ background: 'transparent', border: '1px solid #555', color: '#888', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }} onClick={() => setIsLocal(true)}>
-									Play Local Hotseat (Dev Mode)
-								</button>
-							</div>
-						</div>
-					</div>
-				</div>
-			) : showLobbyBoard ? (
-				// Waiting Room (LOBBY status)
-				<div className="lobby-container">
-					<div className="glass-panel" style={{ textAlign: 'center' }}>
-						<h2>Waiting Room</h2>
-						<div
-							onClick={() => {
-								if (mpState.gameId) {
-									navigator.clipboard.writeText(mpState.gameId);
-									setCopyFeedback(true);
-									setTimeout(() => setCopyFeedback(false), 2000);
-								}
-							}}
-							style={{
-								background: '#222',
-								padding: '10px',
-								borderRadius: '5px',
-								userSelect: 'all',
-								cursor: 'pointer',
-								border: '1px dashed #555',
-								marginBottom: '20px',
-								display: 'flex',
-								alignItems: 'center',
-								justifyContent: 'center',
-								gap: '10px',
-								transition: 'background 0.2s'
-							}}
-							title="Click to Copy"
-							onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
-							onMouseLeave={(e) => e.currentTarget.style.background = '#222'}
-						>
-							<span style={{ fontFamily: 'monospace', fontSize: '1.2rem', letterSpacing: '1px' }}>{mpState.gameId}</span>
-							<span style={{
-								background: copyFeedback ? '#4caf50' : '#444',
-								padding: '4px 8px',
-								borderRadius: '4px',
-								fontSize: '0.8rem',
-								color: 'white',
-								transition: 'all 0.2s',
-								minWidth: '55px',
-								textAlign: 'center'
-							}}>
-								{copyFeedback ? "Copied!" : "Copy"}
-							</span>
-						</div>
-						<small>Share this Game Code</small>
+								<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+									<div style={{ borderBottom: '1px solid #444', paddingBottom: '1rem', marginBottom: '1rem' }}>
+										<h3>Online Multiplayer</h3>
 
-						<div style={{ marginTop: '20px', textAlign: 'left' }}>
-							<h4>Players ({state.players.length}/4)</h4>
-							<ul>
-								{state.players.map(p => (
-									<li key={p.id} style={{ color: p.id === playerUUID ? 'lime' : 'white' }}>
-										{p.name} {p.id === playerUUID ? '(You)' : ''}
-									</li>
-								))}
-							</ul>
-						</div>
+										{/* Name Input */}
+										<div style={{ marginBottom: '15px' }}>
+											<input
+												type="text"
+												placeholder="Enter Your Name"
+												value={playerName}
+												onChange={(e) => setPlayerName(e.target.value)}
+												style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', width: '100%', boxSizing: 'border-box', textAlign: 'center', fontSize: '1.1rem' }}
+											/>
+										</div>
 
-						{mpState.isHost ? (
-							<>
-								<div style={{ marginBottom: '15px' }}>
-									<label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer', gap: '8px', userSelect: 'none' }}>
-										<input
-											type="checkbox"
-											checked={randomizeOrder}
-											onChange={(e) => setRandomizeOrder(e.target.checked)}
-											style={{
-												cursor: 'pointer',
-												width: '18px',
-												height: '18px',
-												accentColor: '#4facfe'
-											}}
-										/>
-										<span style={{ color: '#ccc', fontSize: '0.95rem' }}>Randomize Player Order</span>
-									</label>
+										{!playerUUID ? (
+											<div style={{ color: '#aaa' }}>Establishing secure connection...</div>
+										) : mpState.connectionStatus === 'idle' || mpState.connectionStatus === 'error' ? (
+											<>
+												{/* Timer Selection */}
+												<div style={{ marginBottom: '20px', color: '#ccc', fontSize: '0.9rem' }}>
+													<label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Turn Timer</label>
+													<div style={{
+														display: 'inline-flex',
+														background: 'rgba(255,255,255,0.05)',
+														borderRadius: '25px',
+														border: '1px solid #444',
+														overflow: 'hidden'
+													}}>
+														{[30, 60, 90, 120, 0].map(val => (
+															<button
+																key={val}
+																onClick={() => setTurnLimit(val)}
+																style={{
+																	padding: '8px 16px',
+																	borderRadius: 0,
+																	border: 'none',
+																	borderRight: '1px solid #555',
+																	background: turnLimit === val ? '#4facfe' : 'transparent',
+																	color: turnLimit === val ? 'white' : '#aaa',
+																	cursor: 'pointer',
+																	fontSize: '0.85rem',
+																	fontWeight: turnLimit === val ? 'bold' : 'normal',
+																	transition: 'all 0.2s',
+																	minWidth: '50px'
+																}}
+															>
+																{val === 0 ? "No Timer" : `${val}s`}
+															</button>
+														))}
+
+														<div style={{ position: 'relative', display: 'flex', alignItems: 'center', background: ![30, 60, 90, 120, 0].includes(turnLimit) ? '#4facfe' : 'transparent' }}>
+															<input
+																type="number"
+																min="10"
+																max="600"
+																value={turnLimit}
+																onChange={(e) => setTurnLimit(Math.max(0, parseInt(e.target.value) || 0))}
+																style={{
+																	width: '60px',
+																	padding: '8px 10px',
+																	border: 'none',
+																	background: 'transparent',
+																	color: ![30, 60, 90, 120, 0].includes(turnLimit) ? 'white' : '#aaa',
+																	textAlign: 'center',
+																	fontSize: '0.85rem',
+																	fontWeight: ![30, 60, 90, 120, 0].includes(turnLimit) ? 'bold' : 'normal',
+																	outline: 'none',
+																	MozAppearance: 'textfield'
+																}}
+																placeholder="Custom"
+															/>
+														</div>
+													</div>
+												</div>
+
+												{formError && (
+													<div style={{ color: '#ff5555', marginBottom: '10px', fontSize: '0.9rem', background: 'rgba(255,0,0,0.1)', padding: '5px', borderRadius: '4px' }}>
+														{formError}
+													</div>
+												)}
+
+												<button className="btn-primary" onClick={() => {
+													if (playerName.trim()) hostGame(playerName, playerUUID, turnLimit);
+													else setFormError("Please enter your name first!");
+												}}>Create New Game</button>
+												<div style={{ margin: '10px' }}>or</div>
+												<div style={{ display: 'flex', gap: '5px' }}>
+													<input
+														type="text"
+														placeholder="Enter Game Code (UUID)"
+														value={remoteId}
+														onChange={(e) => setRemoteId(e.target.value)}
+														style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', flex: 1 }}
+													/>
+													<button className="btn-primary" onClick={() => {
+														if (remoteId.trim() && playerName.trim()) joinGame(remoteId, playerName, playerUUID);
+														else setFormError("Please enter your name and Game Code!");
+													}}>Join</button>
+												</div>
+											</>
+										) : (
+											<div style={{ animation: 'pulse 2s infinite' }}>Connecting...</div>
+										)}
+
+										{mpState.errorMessage && (
+											<div style={{ marginTop: '10px', color: 'red', background: 'rgba(255,0,0,0.1)', padding: '10px', borderRadius: '5px' }}>
+												<strong>Error:</strong> {mpState.errorMessage}
+												<br />
+												<small onClick={() => window.location.reload()} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Reset</small>
+											</div>
+										)}
+									</div>
+
+									<div>
+										<div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+											<button style={{ background: 'transparent', border: '1px solid #555', color: '#888', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }} onClick={() => setIsLocal(true)}>
+												Play Local Hotseat (Dev Mode)
+											</button>
+											<Link to="/leaderboard" className="btn-leaderboard">
+												🏆 Leaderboard
+											</Link>
+										</div>
+									</div>
 								</div>
-								<button
-									className="btn-primary"
-									onClick={handleStartGame}
-									disabled={state.players.length < 2}
-									style={{
-										opacity: state.players.length < 2 ? 0.5 : 1,
-										cursor: state.players.length < 2 ? 'not-allowed' : 'pointer'
-									}}
-								>
-									{state.players.length < 2 ? "Waiting for 2nd Player..." : "Start Game"}
-								</button>
-							</>
-						) : (
-							<p>Waiting for host to start...</p>
-						)}
-
-						<div style={{ marginTop: '30px', borderTop: '1px solid #444', paddingTop: '20px' }}>
-							{mpState.isHost ? (
-								<button
-									style={{
-										background: 'rgba(255, 0, 0, 0.2)',
-										color: '#ff4444',
-										border: '1px solid #ff4444',
-										padding: '8px 16px',
-										borderRadius: '4px',
-										cursor: 'pointer',
-										fontSize: '0.9rem'
-									}}
-									onClick={(e) => {
-										const btn = e.currentTarget;
-										if (btn.innerText === "Confirm Close?") {
-											closeLobby();
-										} else {
-											btn.innerText = "Confirm Close?";
-											setTimeout(() => btn.innerText = "Close Lobby", 3000);
-										}
-									}}
-								>
-									Close Lobby
-								</button>
-							) : (
-								<button
-									style={{
-										background: 'rgba(255, 0, 0, 0.2)',
-										color: '#ff4444',
-										border: '1px solid #ff4444',
-										padding: '8px 16px',
-										borderRadius: '4px',
-										cursor: 'pointer',
-										fontSize: '0.9rem'
-									}}
-									onClick={() => {
-										if (window.confirm("Are you sure you want to leave the game?")) {
-											leaveGame();
-										}
-									}}
-								>
-									Leave Game
-								</button>
-							)}
+							</div>
 						</div>
-					</div>
+					) : showLobbyBoard ? (
+						// Waiting Room (LOBBY status)
+						<div className="lobby-container">
+							<div className="glass-panel" style={{ textAlign: 'center' }}>
+								<h2>Waiting Room</h2>
+								<div
+									onClick={() => {
+										if (mpState.gameId) {
+											navigator.clipboard.writeText(mpState.gameId);
+											setCopyFeedback(true);
+											setTimeout(() => setCopyFeedback(false), 2000);
+										}
+									}}
+									style={{
+										background: '#222',
+										padding: '10px',
+										borderRadius: '5px',
+										userSelect: 'all',
+										cursor: 'pointer',
+										border: '1px dashed #555',
+										marginBottom: '20px',
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										gap: '10px',
+										transition: 'background 0.2s'
+									}}
+									title="Click to Copy"
+									onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
+									onMouseLeave={(e) => e.currentTarget.style.background = '#222'}
+								>
+									<span style={{ fontFamily: 'monospace', fontSize: '1.2rem', letterSpacing: '1px' }}>{mpState.gameId}</span>
+									<span style={{
+										background: copyFeedback ? '#4caf50' : '#444',
+										padding: '4px 8px',
+										borderRadius: '4px',
+										fontSize: '0.8rem',
+										color: 'white',
+										transition: 'all 0.2s',
+										minWidth: '55px',
+										textAlign: 'center'
+									}}>
+										{copyFeedback ? "Copied!" : "Copy"}
+									</span>
+								</div>
+								<small>Share this Game Code</small>
+
+								<div style={{ marginTop: '20px', textAlign: 'left' }}>
+									<h4>Players ({state.players.length}/4)</h4>
+									<ul>
+										{state.players.map(p => (
+											<li key={p.id} style={{ color: p.id === playerUUID ? 'lime' : 'white' }}>
+												{p.name} {p.id === playerUUID ? '(You)' : ''}
+											</li>
+										))}
+									</ul>
+								</div>
+
+								{mpState.isHost ? (
+									<>
+										<div style={{ marginBottom: '15px' }}>
+											<label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer', gap: '8px', userSelect: 'none' }}>
+												<input
+													type="checkbox"
+													checked={randomizeOrder}
+													onChange={(e) => setRandomizeOrder(e.target.checked)}
+													style={{
+														cursor: 'pointer',
+														width: '18px',
+														height: '18px',
+														accentColor: '#4facfe'
+													}}
+												/>
+												<span style={{ color: '#ccc', fontSize: '0.95rem' }}>Randomize Player Order</span>
+											</label>
+										</div>
+										<button
+											className="btn-primary"
+											onClick={handleStartGame}
+											disabled={state.players.length < 2}
+											style={{
+												opacity: state.players.length < 2 ? 0.5 : 1,
+												cursor: state.players.length < 2 ? 'not-allowed' : 'pointer'
+											}}
+										>
+											{state.players.length < 2 ? "Waiting for 2nd Player..." : "Start Game"}
+										</button>
+									</>
+								) : (
+									<p>Waiting for host to start...</p>
+								)}
+
+								<div style={{ marginTop: '30px', borderTop: '1px solid #444', paddingTop: '20px' }}>
+									{mpState.isHost ? (
+										<button
+											style={{
+												background: 'rgba(255, 0, 0, 0.2)',
+												color: '#ff4444',
+												border: '1px solid #ff4444',
+												padding: '8px 16px',
+												borderRadius: '4px',
+												cursor: 'pointer',
+												fontSize: '0.9rem'
+											}}
+											onClick={(e) => {
+												const btn = e.currentTarget;
+												if (btn.innerText === "Confirm Close?") {
+													closeLobby();
+												} else {
+													btn.innerText = "Confirm Close?";
+													setTimeout(() => btn.innerText = "Close Lobby", 3000);
+												}
+											}}
+										>
+											Close Lobby
+										</button>
+									) : (
+										<button
+											style={{
+												background: 'rgba(255, 0, 0, 0.2)',
+												color: '#ff4444',
+												border: '1px solid #ff4444',
+												padding: '8px 16px',
+												borderRadius: '4px',
+												cursor: 'pointer',
+												fontSize: '0.9rem'
+											}}
+											onClick={() => {
+												if (window.confirm("Are you sure you want to leave the game?")) {
+													leaveGame();
+												}
+											}}
+										>
+											Leave Game
+										</button>
+									)}
+								</div>
+							</div>
+						</div>
+					) : (
+						<GameBoard
+							state={state}
+							dispatch={dispatch}
+							myPeerId={myPlayerId || (isLocal ? state.players[state.currentPlayerIndex].id : null)}
+							myUUID={playerUUID}
+							closeLobby={closeLobby}
+							isHost={mpState.isHost}
+						/>
+					)}
 				</div>
-			) : (
-				<GameBoard
-					state={state}
-					dispatch={dispatch}
-					myPeerId={myPlayerId || (isLocal ? state.players[state.currentPlayerIndex].id : null)}
-					myUUID={playerUUID}
-					closeLobby={closeLobby}
-					isHost={mpState.isHost}
-				/>
-			)}
-		</div>
+			} />
+		</Routes>
 	);
 }
 

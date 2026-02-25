@@ -9,6 +9,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+/**
+ * Local helper to upsert a profile row.
+ * Defined here (instead of importing from profileService) to avoid a circular dependency.
+ */
+const upsertProfileLocal = async (userId: string, displayName: string) => {
+    const { error } = await supabase
+        .from('profiles')
+        .upsert({ id: userId, display_name: displayName }, { onConflict: 'id' });
+    if (error) {
+        console.error('Error upserting profile:', error);
+    }
+};
+
+// ── Anonymous Auth (unchanged) ──────────────────────────────────────
 export const signInAnonymously = async () => {
     const { data, error } = await supabase.auth.signInAnonymously();
     if (error) {
@@ -16,4 +30,79 @@ export const signInAnonymously = async () => {
         return null;
     }
     return data.user?.id;
+};
+
+// ── Email/Password Auth (new) ───────────────────────────────────────
+
+export const signUpWithEmail = async (email: string, password: string, displayName: string): Promise<{ userId: string | null; error: string | null }> => {
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+    });
+
+    if (error) {
+        console.error('Error signing up:', error);
+        return { userId: null, error: error.message };
+    }
+
+    const userId = data.user?.id;
+    if (userId) {
+        // Create a profile row for this registered user
+        await upsertProfileLocal(userId, displayName);
+    }
+
+    return { userId: userId || null, error: null };
+};
+
+export const signInWithEmail = async (email: string, password: string): Promise<{ userId: string | null; error: string | null }> => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+    });
+
+    if (error) {
+        console.error('Error signing in:', error);
+        return { userId: null, error: error.message };
+    }
+
+    return { userId: data.user?.id || null, error: null };
+};
+
+export const signOutUser = async (): Promise<void> => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+        console.error('Error signing out:', error);
+    }
+};
+
+/**
+ * Upgrade an anonymous session to a permanent email/password account.
+ * Supabase supports this natively via updateUser.
+ */
+export const linkAnonymousToEmail = async (email: string, password: string, displayName: string): Promise<{ success: boolean; error: string | null }> => {
+    const { data, error } = await supabase.auth.updateUser({
+        email,
+        password,
+    });
+
+    if (error) {
+        console.error('Error linking anonymous account:', error);
+        return { success: false, error: error.message };
+    }
+
+    const userId = data.user?.id;
+    if (userId) {
+        await upsertProfileLocal(userId, displayName);
+    }
+
+    return { success: true, error: null };
+};
+
+/**
+ * Check if the current user is anonymous (no email).
+ */
+export const isAnonymousUser = async (): Promise<boolean> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return true;
+    return user.is_anonymous === true;
 };

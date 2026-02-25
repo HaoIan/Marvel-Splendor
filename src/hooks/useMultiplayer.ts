@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { GameAction } from './gameReducer';
 import { gameReducer } from './gameReducer';
 import type { GameState } from '../types';
+import { saveMatchResult } from '../lib/matchResultService';
 
 export interface MultiplayerState {
     playerId: string | null; // My ID (used for turn checks)
@@ -25,6 +26,7 @@ export const useMultiplayer = (
     });
 
     const pollingRef = useRef<any>(null);
+    const matchResultSavedRef = useRef(false);
 
     const gameStateRef = useRef(gameState);
     useEffect(() => {
@@ -152,6 +154,12 @@ export const useMultiplayer = (
                 }
 
                 dispatch({ type: 'SYNC_STATE', state: newState });
+
+                // Save match result on GAME_OVER (host only, once)
+                if (newState.status === 'GAME_OVER' && isCreator && !matchResultSavedRef.current) {
+                    matchResultSavedRef.current = true;
+                    saveMatchResult(gameId, newState);
+                }
             })
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
@@ -178,6 +186,12 @@ export const useMultiplayer = (
                     window.location.reload();
                 } else {
                     dispatch({ type: 'SYNC_STATE', state: remoteState });
+
+                    // Save match result on GAME_OVER (host only, once)
+                    if (remoteState.status === 'GAME_OVER' && isCreator && !matchResultSavedRef.current) {
+                        matchResultSavedRef.current = true;
+                        saveMatchResult(gameId, remoteState);
+                    }
                 }
             }
         }, 3000);
