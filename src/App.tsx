@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
-import { supabase, signInAnonymously, signUpWithEmail, signInWithEmail, signOutUser, linkAnonymousToEmail, isAnonymousUser } from './lib/supabase';
+import { supabase, signInAnonymously, signUpWithEmail, signInWithEmail, signOutUser, linkAnonymousToEmail, isAnonymousUser, signInWithGoogle } from './lib/supabase';
 import { getProfile, type Profile } from './lib/profileService';
 import './App.css';
 import { useGameEngine } from './hooks/useGameEngine';
@@ -28,6 +28,29 @@ function App() {
 				});
 			}
 		});
+
+		// Listen for auth state changes (handles OAuth redirects)
+		const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+			if (event === 'SIGNED_IN' && session) {
+				const user = session.user;
+				setPlayerUUID(user.id);
+
+				// For OAuth users, auto-create profile if needed
+				if (user.app_metadata?.provider === 'google') {
+					const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Player';
+					const { data: existing } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
+					if (!existing) {
+						await supabase.from('profiles').upsert({ id: user.id, display_name: displayName }, { onConflict: 'id' });
+					}
+					setIsRegistered(true);
+					setPlayerName(displayName);
+					setMenuStep('lobby');
+					getProfile(user.id).then(p => { if (p) setProfile(p); });
+				}
+			}
+		});
+
+		return () => subscription.unsubscribe();
 	}, []);
 
 	const { state, dispatch, mpState, hostGame, joinGame, closeLobby, leaveGame } = useGameEngine(playerUUID);
@@ -46,10 +69,12 @@ function App() {
 
 	const myPlayerId = isLocal ? null : mpState.playerId;
 
+	// Menu step navigation: welcome → auth → lobby
+	const [menuStep, setMenuStep] = useState<'welcome' | 'auth' | 'lobby'>('welcome');
+
 	// Auth state for optional sign-up/login
 	const [isRegistered, setIsRegistered] = useState(false);
 	const [profile, setProfile] = useState<Profile | null>(null);
-	const [showAuthPanel, setShowAuthPanel] = useState(false);
 	const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
 	const [authEmail, setAuthEmail] = useState('');
 	const [authPassword, setAuthPassword] = useState('');
@@ -57,18 +82,43 @@ function App() {
 	const [authError, setAuthError] = useState('');
 	const [authLoading, setAuthLoading] = useState(false);
 
-	// Check if current user is registered on load
+	// Easter egg: secret hotseat mode
+	const titleClickCount = useRef(0);
+	const titleClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const [devToast, setDevToast] = useState(false);
+
+	const handleTitleClick = () => {
+		titleClickCount.current++;
+		if (titleClickCount.current >= 5) {
+			titleClickCount.current = 0;
+			if (titleClickTimer.current) clearTimeout(titleClickTimer.current);
+			setDevToast(true);
+			setTimeout(() => setDevToast(false), 2000);
+			setIsLocal(true);
+			return;
+		}
+		if (titleClickTimer.current) clearTimeout(titleClickTimer.current);
+		titleClickTimer.current = setTimeout(() => { titleClickCount.current = 0; }, 2000);
+	};
+
+	// Check if current user is registered on load → auto-advance to lobby
 	useEffect(() => {
 		if (!playerUUID) return;
-		isAnonymousUser().then(isAnon => {
+		isAnonymousUser().then(async (isAnon) => {
 			if (!isAnon) {
 				setIsRegistered(true);
-				getProfile(playerUUID).then(p => {
-					if (p) {
-						setProfile(p);
-						if (!playerName) setPlayerName(p.display_name);
-					}
-				});
+				let p = await getProfile(playerUUID);
+				if (!p) {
+					// Profile doesn't exist yet (e.g. first OAuth login) — create it
+					const { data: { user } } = await supabase.auth.getUser();
+					const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Player';
+					await supabase.from('profiles').upsert({ id: playerUUID, display_name: displayName }, { onConflict: 'id' });
+					p = await getProfile(playerUUID);
+				}
+				if (p) {
+					setProfile(p);
+					if (!playerName) setPlayerName(p.display_name);
+				}
 			}
 		});
 	}, [playerUUID]);
@@ -94,7 +144,7 @@ function App() {
 				const p = await getProfile(playerUUID);
 				setProfile(p);
 				setPlayerName(authDisplayName);
-				setShowAuthPanel(false);
+				setMenuStep('lobby');
 			}
 		} else {
 			const { userId, error } = await signUpWithEmail(authEmail, authPassword, authDisplayName);
@@ -109,7 +159,7 @@ function App() {
 				const p = await getProfile(userId);
 				setProfile(p);
 				setPlayerName(authDisplayName);
-				setShowAuthPanel(false);
+				setMenuStep('lobby');
 			}
 		}
 		setAuthLoading(false);
@@ -134,7 +184,7 @@ function App() {
 			const p = await getProfile(userId);
 			setProfile(p);
 			if (p) setPlayerName(p.display_name);
-			setShowAuthPanel(false);
+			setMenuStep('lobby');
 		}
 		setAuthLoading(false);
 	};
@@ -144,6 +194,7 @@ function App() {
 		setIsRegistered(false);
 		setProfile(null);
 		setPlayerName('');
+		setMenuStep('welcome');
 		const id = await signInAnonymously();
 		if (id) setPlayerUUID(id);
 	};
@@ -187,212 +238,220 @@ function App() {
 				<div className="App">
 					{!showGame && !showLobbyBoard ? (
 						<div className="lobby-container">
-							<div className="glass-panel" style={{ textAlign: 'center', maxWidth: '500px' }}>
-								<h1 style={{ fontFamily: 'Impact', letterSpacing: '2px', background: 'linear-gradient(to right, #f00, #fc0)', WebkitBackgroundClip: 'text', color: 'transparent', fontSize: '3rem', margin: '0' }}>
-									MARVEL SPLENDOR
-								</h1>
-								<p style={{ color: '#aaa', marginBottom: '2rem' }}>Because Colonist Sucks!</p>
+							{/* ── STEP 1: WELCOME ────────────────────── */}
+							{menuStep === 'welcome' && (
+								<div className="welcome-screen">
+									<h1 className="welcome-title" onClick={handleTitleClick}>
+										Marvel Splendor
+									</h1>
+									<p className="welcome-subtitle">Now with rankings!</p>
 
-								{/* Account Status Bar */}
-								{isRegistered && profile ? (
-									<div className="auth-status-bar">
-										<span className="auth-welcome">
-											<span className="registered-badge">✦</span>
-											{profile.display_name}
-										</span>
-										<span className="auth-stats">{profile.games_won}W / {profile.games_played}G</span>
-										<button onClick={handleSignOut} className="btn-auth-action btn-signout">Sign Out</button>
-									</div>
-								) : (
-									<div style={{ marginBottom: '1rem' }}>
-										<button
-											onClick={() => setShowAuthPanel(!showAuthPanel)}
-											className="btn-auth-toggle"
-										>
-											{showAuthPanel ? 'Hide' : '🔒 Sign Up / Log In'}
-											<span style={{ fontSize: '0.75rem', color: '#888', marginLeft: '6px' }}>(optional)</span>
-										</button>
-
-										{showAuthPanel && (
-											<div className="auth-panel">
-												<div className="auth-tabs">
-													<button
-														className={`auth-tab ${authMode === 'login' ? 'active' : ''}`}
-														onClick={() => { setAuthMode('login'); setAuthError(''); }}
-													>Log In</button>
-													<button
-														className={`auth-tab ${authMode === 'signup' ? 'active' : ''}`}
-														onClick={() => { setAuthMode('signup'); setAuthError(''); }}
-													>Sign Up</button>
-												</div>
-
-												{authMode === 'signup' && (
-													<input
-														type="text"
-														placeholder="Display Name"
-														value={authDisplayName}
-														onChange={(e) => setAuthDisplayName(e.target.value)}
-														className="auth-input"
-													/>
-												)}
-												<input
-													type="email"
-													placeholder="Email"
-													value={authEmail}
-													onChange={(e) => setAuthEmail(e.target.value)}
-													className="auth-input"
-												/>
-												<input
-													type="password"
-													placeholder="Password"
-													value={authPassword}
-													onChange={(e) => setAuthPassword(e.target.value)}
-													className="auth-input"
-												/>
-
-												{authError && (
-													<div className="auth-error">{authError}</div>
-												)}
-
-												<button
-													onClick={authMode === 'signup' ? handleSignUp : handleSignIn}
-													className="btn-primary"
-													disabled={authLoading}
-													style={{ width: '100%', opacity: authLoading ? 0.6 : 1 }}
-												>
-													{authLoading ? 'Please wait...' : authMode === 'signup' ? 'Create Account' : 'Log In'}
-												</button>
-											</div>
-										)}
-									</div>
-								)}
-
-								<div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-									<div style={{ borderBottom: '1px solid #444', paddingBottom: '1rem', marginBottom: '1rem' }}>
-										<h3>Online Multiplayer</h3>
-
-										{/* Name Input */}
-										<div style={{ marginBottom: '15px' }}>
-											<input
-												type="text"
-												placeholder="Enter Your Name"
-												value={playerName}
-												onChange={(e) => setPlayerName(e.target.value)}
-												style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', width: '100%', boxSizing: 'border-box', textAlign: 'center', fontSize: '1.1rem' }}
-											/>
-										</div>
-
-										{!playerUUID ? (
-											<div style={{ color: '#aaa' }}>Establishing secure connection...</div>
-										) : mpState.connectionStatus === 'idle' || mpState.connectionStatus === 'error' ? (
+									<div className="welcome-actions">
+										{isRegistered && profile ? (
 											<>
-												{/* Timer Selection */}
-												<div style={{ marginBottom: '20px', color: '#ccc', fontSize: '0.9rem' }}>
-													<label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Turn Timer</label>
-													<div style={{
-														display: 'inline-flex',
-														background: 'rgba(255,255,255,0.05)',
-														borderRadius: '25px',
-														border: '1px solid #444',
-														overflow: 'hidden'
-													}}>
-														{[30, 60, 90, 120, 0].map(val => (
-															<button
-																key={val}
-																onClick={() => setTurnLimit(val)}
-																style={{
-																	padding: '8px 16px',
-																	borderRadius: 0,
-																	border: 'none',
-																	borderRight: '1px solid #555',
-																	background: turnLimit === val ? '#4facfe' : 'transparent',
-																	color: turnLimit === val ? 'white' : '#aaa',
-																	cursor: 'pointer',
-																	fontSize: '0.85rem',
-																	fontWeight: turnLimit === val ? 'bold' : 'normal',
-																	transition: 'all 0.2s',
-																	minWidth: '50px'
-																}}
-															>
-																{val === 0 ? "No Timer" : `${val}s`}
-															</button>
-														))}
-
-														<div style={{ position: 'relative', display: 'flex', alignItems: 'center', background: ![30, 60, 90, 120, 0].includes(turnLimit) ? '#4facfe' : 'transparent' }}>
-															<input
-																type="number"
-																min="10"
-																max="600"
-																value={turnLimit}
-																onChange={(e) => setTurnLimit(Math.max(0, parseInt(e.target.value) || 0))}
-																style={{
-																	width: '60px',
-																	padding: '8px 10px',
-																	border: 'none',
-																	background: 'transparent',
-																	color: ![30, 60, 90, 120, 0].includes(turnLimit) ? 'white' : '#aaa',
-																	textAlign: 'center',
-																	fontSize: '0.85rem',
-																	fontWeight: ![30, 60, 90, 120, 0].includes(turnLimit) ? 'bold' : 'normal',
-																	outline: 'none',
-																	MozAppearance: 'textfield'
-																}}
-																placeholder="Custom"
-															/>
-														</div>
-													</div>
-												</div>
-
-												{formError && (
-													<div style={{ color: '#ff5555', marginBottom: '10px', fontSize: '0.9rem', background: 'rgba(255,0,0,0.1)', padding: '5px', borderRadius: '4px' }}>
-														{formError}
-													</div>
-												)}
-
-												<button className="btn-primary" onClick={() => {
-													if (playerName.trim()) hostGame(playerName, playerUUID, turnLimit);
-													else setFormError("Please enter your name first!");
-												}}>Create New Game</button>
-												<div style={{ margin: '10px' }}>or</div>
-												<div style={{ display: 'flex', gap: '5px' }}>
-													<input
-														type="text"
-														placeholder="Enter Game Code (UUID)"
-														value={remoteId}
-														onChange={(e) => setRemoteId(e.target.value)}
-														style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', flex: 1 }}
-													/>
-													<button className="btn-primary" onClick={() => {
-														if (remoteId.trim() && playerName.trim()) joinGame(remoteId, playerName, playerUUID);
-														else setFormError("Please enter your name and Game Code!");
-													}}>Join</button>
-												</div>
+												<button className="btn-welcome primary" onClick={() => setMenuStep('lobby')}>
+													Play Game
+												</button>
+												<button className="btn-welcome secondary" onClick={handleSignOut}>
+													Sign Out
+												</button>
 											</>
 										) : (
-											<div style={{ animation: 'pulse 2s infinite' }}>Connecting...</div>
-										)}
-
-										{mpState.errorMessage && (
-											<div style={{ marginTop: '10px', color: 'red', background: 'rgba(255,0,0,0.1)', padding: '10px', borderRadius: '5px' }}>
-												<strong>Error:</strong> {mpState.errorMessage}
-												<br />
-												<small onClick={() => window.location.reload()} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Reset</small>
-											</div>
+											<>
+												<div className="welcome-auth-row">
+													<button className="btn-welcome primary" onClick={() => { setAuthMode('login'); setAuthError(''); setMenuStep('auth'); }}>
+														Log In
+													</button>
+													<button className="btn-welcome primary" onClick={() => { setAuthMode('signup'); setAuthError(''); setMenuStep('auth'); }}>
+														Sign Up
+													</button>
+												</div>
+												<div className="welcome-divider">
+													<span>or</span>
+												</div>
+												<button className="btn-welcome secondary" onClick={() => setMenuStep('lobby')}>
+													Continue as Guest
+												</button>
+											</>
 										)}
 									</div>
 
-									<div>
-										<div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-											<button style={{ background: 'transparent', border: '1px solid #555', color: '#888', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }} onClick={() => setIsLocal(true)}>
-												Play Local Hotseat (Dev Mode)
-											</button>
-											<Link to="/leaderboard" className="btn-leaderboard">
-												🏆 Leaderboard
-											</Link>
+									<Link to="/leaderboard" className="btn-leaderboard" style={{ marginTop: '1.5rem' }}>
+										Leaderboard
+									</Link>
+								</div>
+							)}
+
+							{/* ── STEP 2: AUTH ─────────────────────────── */}
+							{menuStep === 'auth' && (
+								<div className="auth-screen glass-panel">
+									<button className="btn-back-nav" onClick={() => setMenuStep('welcome')}>← Back</button>
+
+									<h1 className="welcome-title">
+										Marvel Splendor
+									</h1>
+									<p className="welcome-subtitle">Now with rankings!</p>
+
+									{authMode === 'signup' && (
+										<input
+											type="text"
+											placeholder="Display Name"
+											value={authDisplayName}
+											onChange={(e) => setAuthDisplayName(e.target.value)}
+											className="auth-input"
+										/>
+									)}
+									<input type="email" placeholder="Email" value={authEmail}
+										onChange={(e) => setAuthEmail(e.target.value)} className="auth-input" />
+									<input type="password" placeholder="Password" value={authPassword}
+										onChange={(e) => setAuthPassword(e.target.value)} className="auth-input" />
+
+									{authError && <div className="auth-error">{authError}</div>}
+
+									<button
+										onClick={authMode === 'signup' ? handleSignUp : handleSignIn}
+										className="btn-primary"
+										disabled={authLoading}
+										style={{ width: '100%', opacity: authLoading ? 0.6 : 1 }}
+									>
+										{authLoading ? 'Please wait...' : authMode === 'signup' ? 'Create Account' : 'Log In'}
+									</button>
+
+									<p className="auth-toggle-text">
+										{authMode === 'signup' ? (
+											<>Already have an account? <button type="button" className="btn-link" onClick={() => { setAuthMode('login'); setAuthError(''); }}>Log In</button></>
+										) : (
+											<>New to Marvel Splendor? <button type="button" className="btn-link" onClick={() => { setAuthMode('signup'); setAuthError(''); }}>Sign Up</button></>
+										)}
+									</p>
+
+									<div className="welcome-divider"><span>or</span></div>
+
+									<button
+										className="btn-google"
+										onClick={async () => {
+											setAuthLoading(true);
+											const { error } = await signInWithGoogle();
+											if (error) { setAuthError(error); setAuthLoading(false); }
+										}}
+										disabled={authLoading}
+									>
+										<svg viewBox="0 0 24 24" width="18" height="18" style={{ marginRight: '8px', verticalAlign: 'middle' }}>
+											<path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+											<path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+											<path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+											<path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+										</svg>
+										Continue with Google
+									</button>
+								</div>
+							)}
+
+							{/* ── STEP 3: LOBBY ────────────────────────── */}
+							{menuStep === 'lobby' && (
+								<div className="lobby-screen glass-panel">
+									<button className="btn-back-nav" style={{ display: 'block', textAlign: 'left' }} onClick={() => setMenuStep('welcome')}>← Back</button>
+									<h1 className="welcome-title">
+										Marvel Splendor
+									</h1>
+									<p className="welcome-subtitle">Now with rankings!</p>
+
+									<div className="lobby-header">
+										<h3 style={{ margin: 0 }}>Online Multiplayer</h3>
+										{isRegistered && profile ? (
+											<span className="lobby-user-badge">{profile.display_name}</span>
+										) : (
+											<span className="lobby-user-badge guest">Guest</span>
+										)}
+									</div>
+
+									{/* Name Input */}
+									<div style={{ marginBottom: '15px' }}>
+										<input
+											type="text"
+											placeholder="Enter Your Name"
+											value={playerName}
+											onChange={(e) => setPlayerName(e.target.value)}
+											className="auth-input"
+											style={{ textAlign: 'center', fontSize: '1.1rem' }}
+										/>
+									</div>
+
+									{!playerUUID ? (
+										<div style={{ color: '#aaa' }}>Establishing secure connection...</div>
+									) : mpState.connectionStatus === 'idle' || mpState.connectionStatus === 'error' ? (
+										<>
+											{/* Timer Selection */}
+											<div style={{ marginBottom: '20px', color: '#ccc', fontSize: '0.9rem' }}>
+												<label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>Turn Timer</label>
+												<div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.05)', borderRadius: '25px', border: '1px solid #444', overflow: 'hidden' }}>
+													{[30, 60, 90, 120, 0].map(val => (
+														<button key={val} onClick={() => setTurnLimit(val)} style={{
+															padding: '8px 16px', borderRadius: 0, border: 'none',
+															borderRight: '1px solid #555',
+															background: turnLimit === val ? '#4facfe' : 'transparent',
+															color: turnLimit === val ? 'white' : '#aaa',
+															cursor: 'pointer', fontSize: '0.85rem',
+															fontWeight: turnLimit === val ? 'bold' : 'normal',
+															transition: 'all 0.2s', minWidth: '50px'
+														}}>{val === 0 ? "No Timer" : `${val}s`}</button>
+													))}
+													<div style={{ position: 'relative', display: 'flex', alignItems: 'center', background: ![30, 60, 90, 120, 0].includes(turnLimit) ? '#4facfe' : 'transparent' }}>
+														<input type="number" min="10" max="600" value={turnLimit}
+															onChange={(e) => setTurnLimit(Math.max(0, parseInt(e.target.value) || 0))}
+															style={{
+																width: '60px', padding: '8px 10px', border: 'none', background: 'transparent',
+																color: ![30, 60, 90, 120, 0].includes(turnLimit) ? 'white' : '#aaa',
+																textAlign: 'center', fontSize: '0.85rem',
+																fontWeight: ![30, 60, 90, 120, 0].includes(turnLimit) ? 'bold' : 'normal',
+																outline: 'none', MozAppearance: 'textfield'
+															}}
+															placeholder="Custom" />
+													</div>
+												</div>
+											</div>
+
+											{formError && (
+												<div style={{ color: '#ff5555', marginBottom: '10px', fontSize: '0.9rem', background: 'rgba(255,0,0,0.1)', padding: '5px', borderRadius: '4px' }}>
+													{formError}
+												</div>
+											)}
+
+											<button className="btn-primary" onClick={() => {
+												if (playerName.trim()) hostGame(playerName, playerUUID, turnLimit);
+												else setFormError("Please enter your name first!");
+											}}>Create New Game</button>
+											<div style={{ margin: '10px', color: '#666' }}>or</div>
+											<div style={{ display: 'flex', gap: '5px' }}>
+												<input type="text" placeholder="Enter Game Code (UUID)" value={remoteId}
+													onChange={(e) => setRemoteId(e.target.value)}
+													className="auth-input" style={{ flex: 1 }} />
+												<button className="btn-primary" onClick={() => {
+													if (remoteId.trim() && playerName.trim()) joinGame(remoteId, playerName, playerUUID);
+													else setFormError("Please enter your name and Game Code!");
+												}}>Join</button>
+											</div>
+										</>
+									) : (
+										<div style={{ animation: 'pulse 2s infinite' }}>Connecting...</div>
+									)}
+
+									{mpState.errorMessage && (
+										<div style={{ marginTop: '10px', color: 'red', background: 'rgba(255,0,0,0.1)', padding: '10px', borderRadius: '5px' }}>
+											<strong>Error:</strong> {mpState.errorMessage}
+											<br />
+											<small onClick={() => window.location.reload()} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Reset</small>
 										</div>
+									)}
+
+									<div style={{ marginTop: '1.5rem', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+										<Link to="/leaderboard" className="btn-leaderboard">🏆 Leaderboard</Link>
 									</div>
 								</div>
-							</div>
+							)}
+
+							{/* Dev toast for Easter egg */}
+							{devToast && <div className="dev-toast">🎮 Dev Mode Activated!</div>}
 						</div>
 					) : showLobbyBoard ? (
 						// Waiting Room (LOBBY status)
@@ -542,10 +601,11 @@ function App() {
 							closeLobby={closeLobby}
 							isHost={mpState.isHost}
 						/>
-					)}
-				</div>
+					)
+					}
+				</div >
 			} />
-		</Routes>
+		</Routes >
 	);
 }
 

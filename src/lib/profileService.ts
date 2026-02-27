@@ -13,16 +13,13 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
     if (error) {
-        // PGRST116 = row not found, expected for anonymous users
-        if (error.code !== 'PGRST116') {
-            console.error('Error fetching profile:', error);
-        }
+        console.error('Error fetching profile:', error);
         return null;
     }
-    return data as Profile;
+    return data as Profile | null;
 };
 
 export const upsertProfile = async (userId: string, displayName: string): Promise<Profile | null> => {

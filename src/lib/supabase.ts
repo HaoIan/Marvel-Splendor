@@ -106,3 +106,21 @@ export const isAnonymousUser = async (): Promise<boolean> => {
     if (!user) return true;
     return user.is_anonymous === true;
 };
+
+// ── Google OAuth ────────────────────────────────────────────────────
+
+export const signInWithGoogle = async (): Promise<{ error: string | null }> => {
+    const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            redirectTo: window.location.origin,
+        },
+    });
+
+    if (error) {
+        console.error('Error signing in with Google:', error);
+        return { error: error.message };
+    }
+
+    return { error: null };
+};

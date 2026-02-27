@@ -6,7 +6,7 @@ import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter basename="/marvel-splendor">
+    <BrowserRouter basename="/Marvel-Splendor/">
       <App />
     </BrowserRouter>
   </StrictMode>,
