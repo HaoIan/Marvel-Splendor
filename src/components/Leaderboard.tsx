@@ -17,7 +17,6 @@ export const Leaderboard = () => {
         <div className="leaderboard-page">
             <div className="leaderboard-container">
                 <h1 className="leaderboard-title">
-                    <span className="leaderboard-icon">🏆</span>
                     Leaderboard
                 </h1>
 
@@ -71,7 +70,7 @@ export const Leaderboard = () => {
 
                 <div className="leaderboard-footer">
                     <Link to="/" className="btn-back">
-                        ← Back to Lobby
+                        ← Back
                     </Link>
                 </div>
             </div>
