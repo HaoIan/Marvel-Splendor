@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { supabase, signInAnonymously, signUpWithEmail, signInWithEmail, signOutUser, isAnonymousUser, signInWithGoogle } from './lib/supabase';
 import { getProfile, getAvatarUrl, type Profile } from './lib/profileService';
 import './App.css';
@@ -12,6 +12,7 @@ function App() {
 	// Identity logic
 	const [playerUUID, setPlayerUUID] = useState('');
 	const initializingRef = useRef(false);
+	const navigate = useNavigate();
 
 	useEffect(() => {
 		if (initializingRef.current) return;
@@ -179,6 +180,7 @@ function App() {
 		setPlayerName('');
 		setPlayerUUID('');
 		setMenuStep('welcome');
+		navigate('/');
 	};
 
 	// Show Game if:
@@ -216,7 +218,7 @@ function App() {
 	return (
 		<Routes>
 			<Route path="/leaderboard" element={<Leaderboard />} />
-			<Route path="/profile" element={<ProfilePage />} />
+			<Route path="/profile" element={<ProfilePage onSignOut={handleSignOut} />} />
 			<Route path="/" element={
 				<div className="App">
 					{!showGame && !showLobbyBoard ? (
@@ -232,11 +234,18 @@ function App() {
 									<div className="welcome-actions">
 										{isRegistered && profile ? (
 											<>
+												<Link to="/profile" className="lobby-user-profile-display" style={{ alignSelf: 'center' }} title="Go to Profile">
+													{getAvatarUrl(profile) ? (
+														<img src={getAvatarUrl(profile)!} alt="Avatar" className="lobby-profile-avatar" />
+													) : (
+														<div className="lobby-profile-avatar-placeholder">
+															{profile.display_name.charAt(0).toUpperCase()}
+														</div>
+													)}
+													<span className="lobby-profile-name">{profile.display_name}</span>
+												</Link>
 												<button className="btn-welcome primary" onClick={() => setMenuStep('lobby')}>
 													Play Game
-												</button>
-												<button className="btn-welcome secondary" onClick={handleSignOut}>
-													Sign Out
 												</button>
 											</>
 										) : (

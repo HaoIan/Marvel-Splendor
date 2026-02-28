@@ -11,7 +11,11 @@ import {
     type MatchHistoryEntry
 } from '../lib/profileService';
 
-export const ProfilePage = () => {
+interface ProfilePageProps {
+    onSignOut?: () => void;
+}
+
+export const ProfilePage: React.FC<ProfilePageProps> = ({ onSignOut }) => {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [matches, setMatches] = useState<MatchHistoryEntry[]>([]);
     const [loading, setLoading] = useState(true);
@@ -135,6 +139,7 @@ export const ProfilePage = () => {
     const memberSince = new Date(profile.created_at).toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'long',
+        day: 'numeric',
     });
 
     const avatarUrl = getAvatarUrl(profile);
@@ -297,10 +302,15 @@ export const ProfilePage = () => {
                     )}
                 </div>
 
-                <div className="profile-footer" style={{ marginTop: '2rem', textAlign: 'center' }}>
+                <div className="profile-footer" style={{ marginTop: '2rem', textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '1rem' }}>
                     <Link to="/" className="btn-back">
                         ← Back
                     </Link>
+                    {onSignOut && (
+                        <button className="btn-back btn-signout" onClick={onSignOut}>
+                            Sign Out
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

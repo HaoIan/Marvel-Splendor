@@ -65,6 +65,7 @@ export const getLeaderboard = async (limit: number = 20): Promise<Profile[]> => 
     const { data, error } = await supabase
         .from('profiles')
         .select('*')
+        .gt('games_played', 0)
         .order('games_won', { ascending: false })
         .order('games_played', { ascending: true })
         .limit(limit);
