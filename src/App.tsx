@@ -66,8 +66,8 @@ function App() {
 
 	const myPlayerId = isLocal ? null : mpState.playerId;
 
-	// Menu step navigation: welcome → auth → lobby
-	const [menuStep, setMenuStep] = useState<'welcome' | 'auth' | 'lobby'>('welcome');
+	// Menu step navigation: welcome → auth → verify → lobby
+	const [menuStep, setMenuStep] = useState<'welcome' | 'auth' | 'verify' | 'lobby'>('welcome');
 
 	// Auth state for optional sign-up/login
 	const [isRegistered, setIsRegistered] = useState(false);
@@ -128,13 +128,16 @@ function App() {
 		setAuthLoading(true);
 		setAuthError('');
 
-		const { userId, error } = await signUpWithEmail(authEmail, authPassword, authDisplayName);
+		const { userId, error, needsEmailConfirmation } = await signUpWithEmail(authEmail, authPassword, authDisplayName);
 		if (error) {
 			setAuthError(error);
 			setAuthLoading(false);
 			return;
 		}
-		if (userId) {
+
+		if (needsEmailConfirmation) {
+			setMenuStep('verify');
+		} else if (userId) {
 			setPlayerUUID(userId);
 			setIsRegistered(true);
 			const p = await getProfile(userId);
@@ -336,6 +339,43 @@ function App() {
 										<div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
 											<button className="btn-back" onClick={() => setMenuStep('welcome')}>← Back</button>
 										</div>
+									</div>
+								</div>
+							)}
+
+							{/* ── STEP 2.5: VERIFY EMAIL ───────────────── */}
+							{menuStep === 'verify' && (
+								<div className="auth-screen">
+									<h1 className="welcome-title">
+										Marvel Splendor
+									</h1>
+									<p className="welcome-subtitle">Account created successfully!</p>
+
+									<div className="glass-panel" style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
+										<div style={{ marginBottom: '1.5rem' }}>
+											<svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="var(--marvel-blue)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+												<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+												<polyline points="22,6 12,13 2,6"></polyline>
+											</svg>
+										</div>
+										<h3 style={{ marginTop: 0, marginBottom: '1rem', color: 'white' }}>Verify Your Email</h3>
+										<p style={{ margin: '0 0 1.5rem 0', color: '#ccc', lineHeight: '1.5', fontSize: '0.95rem' }}>
+											We sent a confirmation link to<br />
+											<strong style={{ color: 'white' }}>{authEmail}</strong><br /><br />
+											Please check your inbox and click the link to verify your account before logging in.
+										</p>
+
+										<button
+											className="btn-primary"
+											style={{ width: '100%' }}
+											onClick={() => {
+												setMenuStep('auth');
+												setAuthMode('login');
+												setAuthError('');
+											}}
+										>
+											Return to Login
+										</button>
 									</div>
 								</div>
 							)}

@@ -34,10 +34,15 @@ export const signInAnonymously = async () => {
 
 // ── Email/Password Auth (new) ───────────────────────────────────────
 
-export const signUpWithEmail = async (email: string, password: string, displayName: string): Promise<{ userId: string | null; error: string | null }> => {
+export const signUpWithEmail = async (email: string, password: string, displayName: string): Promise<{ userId: string | null; error: string | null; needsEmailConfirmation?: boolean }> => {
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+            data: {
+                display_name: displayName,
+            }
+        }
     });
 
     if (error) {
@@ -45,13 +50,15 @@ export const signUpWithEmail = async (email: string, password: string, displayNa
         return { userId: null, error: error.message };
     }
 
-    const userId = data.user?.id;
-    if (userId) {
-        // Create a profile row for this registered user
-        await upsertProfileLocal(userId, displayName);
+    // Supabase returns an empty identities array on signup if the email already exists
+    // (This is a security feature to prevent email enumeration, but we want to tell the user)
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+        return { userId: null, error: 'User with this email already exists' };
     }
 
-    return { userId: userId || null, error: null };
+    const needsEmailConfirmation = !!data.user && !data.session;
+
+    return { userId: data.user?.id || null, error: null, needsEmailConfirmation };
 };
 
 export const signInWithEmail = async (email: string, password: string): Promise<{ userId: string | null; error: string | null }> => {
