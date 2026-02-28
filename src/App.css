@@ -2139,3 +2139,294 @@ body {
     max-width: 90vw;
   }
 }
+
+/* ============================================
+   PROFILE PAGE
+   ============================================ */
+.profile-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 20px;
+  box-sizing: border-box;
+  backdrop-filter: blur(5px);
+}
+
+.profile-container {
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  border: var(--glass-border);
+  border-radius: 16px;
+  box-shadow: var(--glass-shadow);
+  width: 100%;
+  max-width: 600px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.profile-top-section {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-avatar-section {
+  flex-shrink: 0;
+}
+
+.profile-avatar-wrapper {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  transition: border-color 0.2s;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.profile-avatar-wrapper:hover {
+  border-color: var(--marvel-blue);
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.profile-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  font-weight: bold;
+  color: white;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+}
+
+.profile-avatar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.profile-avatar-wrapper:hover .profile-avatar-overlay,
+.profile-avatar-wrapper.uploading .profile-avatar-overlay {
+  opacity: 1;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.profile-name-section {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-label {
+  font-size: 0.85rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.profile-name-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-name-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.profile-member-since {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 4px;
+}
+
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+  font-family: 'Cinzel', sans-serif;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.match-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.match-history-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: background 0.2s;
+}
+
+.match-history-card:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.match-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.match-result-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.match-result-badge.win {
+  background: rgba(51, 255, 51, 0.15);
+  color: var(--marvel-green);
+  border: 1px solid rgba(51, 255, 51, 0.3);
+}
+
+.match-result-badge.loss {
+  background: rgba(255, 50, 50, 0.15);
+  color: var(--marvel-red);
+  border: 1px solid rgba(255, 50, 50, 0.3);
+}
+
+.match-date {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.match-history-body {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.match-history-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.match-history-stat .label {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.match-history-stat .value {
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+
+.match-history-players {
+  font-size: 0.85rem;
+  color: #aaa;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 8px;
+}
+
+.match-history-players .label {
+  color: #666;
+}
+
+.match-winner-note {
+  color: #888;
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .profile-top-section {
+    flex-direction: column;
+    text-align: center;
+    gap: 1.5rem;
+  }
+
+  .profile-name-display {
+    justify-content: center;
+  }
+
+  .profile-edit-actions {
+    justify-content: center;
+  }
+
+  .profile-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+  }
+
+  .stat-card {
+    padding: 1rem;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .match-history-body {
+    justify-content: space-between;
+  }
+}
