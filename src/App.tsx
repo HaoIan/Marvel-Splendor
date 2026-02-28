@@ -352,29 +352,31 @@ function App() {
 
 										<div className="lobby-header">
 											<h3 style={{ margin: 0 }}>Online Multiplayer</h3>
-											{isRegistered && profile && (
-												<Link to="/profile" className="lobby-user-badge avatar-only" style={{ textDecoration: 'none', display: 'flex' }} title={profile.display_name}>
+										</div>
+
+										{/* Name Input or Profile Badge */}
+										<div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'center' }}>
+											{isRegistered && profile ? (
+												<Link to="/profile" className="lobby-user-profile-display" title="Go to Profile">
 													{getAvatarUrl(profile) ? (
-														<img src={getAvatarUrl(profile)!} alt="Avatar" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(51, 170, 255, 0.5)' }} />
+														<img src={getAvatarUrl(profile)!} alt="Avatar" className="lobby-profile-avatar" />
 													) : (
-														<div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(51, 170, 255, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', color: 'white', border: '2px solid rgba(51, 170, 255, 0.5)', fontWeight: 'bold' }}>
+														<div className="lobby-profile-avatar-placeholder">
 															{profile.display_name.charAt(0).toUpperCase()}
 														</div>
 													)}
+													<span className="lobby-profile-name">{profile.display_name}</span>
 												</Link>
+											) : (
+												<input
+													type="text"
+													placeholder="Enter Your Name"
+													value={playerName}
+													onChange={(e) => setPlayerName(e.target.value)}
+													className="auth-input"
+													style={{ textAlign: 'center', fontSize: '1.1rem' }}
+												/>
 											)}
-										</div>
-
-										{/* Name Input */}
-										<div style={{ marginBottom: '15px' }}>
-											<input
-												type="text"
-												placeholder="Enter Your Name"
-												value={playerName}
-												onChange={(e) => setPlayerName(e.target.value)}
-												className="auth-input"
-												style={{ textAlign: 'center', fontSize: '1.1rem' }}
-											/>
 										</div>
 
 										{!playerUUID ? (
