@@ -294,11 +294,13 @@ function App() {
 
 										{authError && <div className="auth-error">{authError}</div>}
 
+										<br></br>
+
 										<button
 											onClick={authMode === 'signup' ? handleSignUp : handleSignIn}
 											className="btn-primary"
 											disabled={authLoading}
-											style={{ width: '100%', marginTop: '8px', opacity: authLoading ? 0.6 : 1 }}
+											style={{ width: '100%', opacity: authLoading ? 0.6 : 1 }}
 										>
 											{authLoading ? 'Please wait...' : authMode === 'signup' ? 'Create Account' : 'Log In'}
 										</button>

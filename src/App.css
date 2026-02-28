@@ -92,7 +92,7 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--marvel-blue), var(--marvel-purple));
+  background: var(--marvel-blue);
   border: none;
   padding: 12px 24px;
   color: white;
@@ -1693,7 +1693,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: linear-gradient(to right, var(--marvel-yellow), var(--marvel-orange));
+  background: var(--marvel-yellow);
   -webkit-background-clip: text;
   color: transparent;
 }
@@ -1935,7 +1935,7 @@ body {
 }
 
 .btn-welcome.primary {
-  background: linear-gradient(135deg, var(--marvel-blue), var(--marvel-purple));
+  background: var(--marvel-blue);
   color: white;
   box-shadow: 0 4px 20px rgba(51, 170, 255, 0.25);
 }
@@ -1973,12 +1973,15 @@ body {
 .auth-screen .glass-panel {
   max-width: 420px;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .auth-screen-title {
   margin: 0 0 4px 0;
   font-size: 1.5rem;
-  background: linear-gradient(to right, var(--marvel-blue), var(--marvel-purple));
+  background: var(--marvel-blue);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
