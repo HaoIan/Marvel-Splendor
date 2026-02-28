@@ -1961,13 +1961,18 @@ body {
 
 /* ── Auth Screen ──────────────────────────────── */
 .auth-screen {
-  max-width: 420px;
-  width: 100%;
   text-align: center;
   animation: fadeInUp 0.35s ease-out;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
+  width: 100%;
+}
+
+.auth-screen .glass-panel {
+  max-width: 420px;
+  width: 100%;
 }
 
 .auth-screen-title {
@@ -2026,10 +2031,17 @@ body {
 
 /* ── Lobby Screen ─────────────────────────────── */
 .lobby-screen {
-  max-width: 500px;
-  width: 100%;
   text-align: center;
   animation: fadeInUp 0.35s ease-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.lobby-screen .glass-panel {
+  max-width: 500px;
+  width: 100%;
 }
 
 .guest-status-bar {
