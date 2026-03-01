@@ -142,7 +142,7 @@ const LocationView = ({ location, onClick, style, disabled, hideName }: { locati
         style={{
             width: '130px', // Match card width
             height: '130px', // Match card height
-            backgroundImage: `url(${location.image.startsWith('http') || location.image.startsWith('data:') ? location.image : import.meta.env.BASE_URL.replace(/\/$/, '') + location.image.replace(/^\/*/, '/')})`,
+            backgroundImage: `url(${location.image})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             borderRadius: '10px',
