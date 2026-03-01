@@ -41,11 +41,11 @@ export const useMultiplayer = (
         // const savedPlayerId = localStorage.getItem('splendor_playerUUID'); // Deprecated, use Auth ID
         const savedIsHost = localStorage.getItem('splendor_isHost') === 'true';
         const savedName = localStorage.getItem('splendor_playerName');
+        const savedAvatarUrl = localStorage.getItem('splendor_avatarUrl');
 
         if (savedGameId && savedName) {
             console.log("Restoring session:", savedGameId);
-            // We reuse joinGame logic, but need to be careful not to create loop
-            joinGame(savedGameId, savedName, playerUUID, savedIsHost);
+            joinGame(savedGameId, savedName, playerUUID, savedAvatarUrl || null, savedIsHost);
         }
     }, [playerUUID]);
 
@@ -62,13 +62,13 @@ export const useMultiplayer = (
         };
     }, [mpState.gameId]);
 
-    const hostGame = async (playerName: string, playerUUID: string, turnLimitSeconds: number = 60) => {
+    const hostGame = async (playerName: string, playerUUID: string, avatarUrl: string | null, turnLimitSeconds: number = 60) => {
         setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: undefined }));
 
         const defaultState = gameStateRef.current;
         const initialState = {
             ...defaultState,
-            players: [{ id: playerUUID, name: playerName, tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 }, hand: [], tableau: [], points: 0, noble: null }],
+            players: [{ id: playerUUID, name: playerName, avatarUrl, tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 }, hand: [], tableau: [], points: 0, noble: null }],
             status: 'LOBBY',
             config: { turnLimitSeconds },
             turnDeadline: turnLimitSeconds > 0 ? Date.now() + (turnLimitSeconds * 1000) : undefined
@@ -86,10 +86,10 @@ export const useMultiplayer = (
             return;
         }
 
-        joinGame(data.id, playerName, playerUUID, true);
+        joinGame(data.id, playerName, playerUUID, avatarUrl, true);
     };
 
-    const joinGame = async (gameId: string, playerName: string, playerUUID: string, isCreator = false) => {
+    const joinGame = async (gameId: string, playerName: string, playerUUID: string, avatarUrl: string | null, isCreator = false) => {
         setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: undefined }));
 
         // 1. Fetch current state
@@ -125,6 +125,7 @@ export const useMultiplayer = (
                 syncedState.players.push({
                     id: playerUUID,
                     name: playerName,
+                    avatarUrl,
                     tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 } as any,
                     hand: [],
                     tableau: [],
@@ -203,6 +204,11 @@ export const useMultiplayer = (
         localStorage.setItem('splendor_gameId', gameId);
         localStorage.setItem('splendor_isHost', String(isCreator));
         localStorage.setItem('splendor_playerName', playerName);
+        if (avatarUrl) {
+            localStorage.setItem('splendor_avatarUrl', avatarUrl);
+        } else {
+            localStorage.removeItem('splendor_avatarUrl');
+        }
 
         setMpState({
             playerId: playerUUID,

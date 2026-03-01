@@ -117,7 +117,10 @@ export const isAnonymousUser = async (): Promise<boolean> => {
 // ── Google OAuth ────────────────────────────────────────────────────
 
 export const signInWithGoogle = async (): Promise<{ error: string | null }> => {
-    const siteUrl = import.meta.env.VITE_SITE_URL || window.location.origin;
+    // If running `npm run dev` locally, Vite flags `import.meta.env.DEV` as true.
+    // In development we want to redirect to localhost, in production we use the predefined SITE_URL.
+    const isLocal = import.meta.env.DEV;
+    const siteUrl = isLocal ? window.location.origin : (import.meta.env.VITE_SITE_URL || window.location.origin);
 
     const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

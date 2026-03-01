@@ -9,7 +9,7 @@ export type GameAction =
     | { type: 'END_TURN' }
     | { type: 'SYNC_STATE'; state: GameState }
     | { type: 'PLAYER_JOINED'; player: Player }
-    | { type: 'START_GAME'; players: { id: string; name: string; uuid?: string }[]; config?: { turnLimitSeconds: number } }
+    | { type: 'START_GAME'; players: { id: string; name: string; uuid?: string; avatarUrl?: string | null }[]; config?: { turnLimitSeconds: number } }
     | { type: 'RECONNECT_PLAYER'; oldId: string; newId: string }
     | { type: 'PASS_TURN'; expectedPlayerIndex?: number }
     | { type: 'SELECT_LOCATION'; locationId: string }
@@ -25,7 +25,7 @@ const shuffle = (array: any[]) => {
 };
 
 export const createInitialState = (
-    playerConfig: { id: string; name: string; uuid?: string }[],
+    playerConfig: { id: string; name: string; uuid?: string; avatarUrl?: string | null }[],
     config: { turnLimitSeconds: number } = { turnLimitSeconds: 60 }
 ): GameState => {
     const shuffledDeck = shuffle([...INITIAL_DECK]);
@@ -44,6 +44,7 @@ export const createInitialState = (
         id: cfg.id,
         name: cfg.name,
         uuid: cfg.uuid,
+        avatarUrl: cfg.avatarUrl,
         tokens: { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0, green: 0, gray: 0 },
         hand: [],
         tableau: [],

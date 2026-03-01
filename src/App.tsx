@@ -18,12 +18,14 @@ function App() {
 		if (initializingRef.current) return;
 		initializingRef.current = true;
 
-		supabase.auth.getSession().then(({ data: { session } }) => {
-			if (session) {
-				console.log("Existing session found:", session.user.id);
-				setPlayerUUID(session.user.id);
+		// Active verification: Check if stored token is actually accepted by the server
+		supabase.auth.getUser().then(({ data: { user }, error }) => {
+			if (error || !user) {
+				console.log("No valid session found or token expired — wiping local auth state.");
+				supabase.auth.signOut(); // Wipes broken tokens (fixes 403 Forbidden loops)
 			} else {
-				console.log("No existing session — waiting for user action.");
+				console.log("Valid session found:", user.id);
+				setPlayerUUID(user.id);
 			}
 		});
 
@@ -469,7 +471,7 @@ function App() {
 												)}
 
 												<button className="btn-primary" onClick={() => {
-													if (playerName.trim()) hostGame(playerName, playerUUID, turnLimit);
+													if (playerName.trim()) hostGame(playerName, playerUUID, profile?.avatar_url || null, turnLimit);
 													else setFormError("Please enter your name first!");
 												}}>Create New Game</button>
 												<div style={{ margin: '10px', color: '#666' }}>or</div>
@@ -478,7 +480,7 @@ function App() {
 														onChange={(e) => setRemoteId(e.target.value)}
 														className="auth-input" style={{ flex: 1 }} />
 													<button className="btn-primary" onClick={() => {
-														if (remoteId.trim() && playerName.trim()) joinGame(remoteId, playerName, playerUUID);
+														if (remoteId.trim() && playerName.trim()) joinGame(remoteId, playerName, playerUUID, profile?.avatar_url || null);
 														else setFormError("Please enter your name and Game Code!");
 													}}>Join</button>
 												</div>

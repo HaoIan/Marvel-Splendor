@@ -182,8 +182,16 @@ const LocationView = ({ location, onClick, style, disabled, hideName }: { locati
 const PlayerArea = ({ player, isActive, onCardClick, onLocationClick, isMe, hasAvengersTile, onAvengersClick }: { player: Player, isActive: boolean, onCardClick: (card: CardType) => void, onLocationClick: (loc: Location) => void, isMe?: boolean, hasAvengersTile?: boolean, onAvengersClick?: () => void }) => (
     <div id={`player-area-${player.id}`} className={`player-card ${isActive ? 'active-turn' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', color: isActive ? 'var(--marvel-green)' : 'inherit', textShadow: isActive ? '0 0 10px var(--marvel-green)' : 'none' }}>
-                {player.name} {isMe ? <span style={{ color: 'var(--marvel-blue)', fontSize: '0.8rem' }}>(You)</span> : ''}
+            <h3 style={{ margin: 0, fontSize: '1rem', color: isActive ? 'var(--marvel-green)' : 'inherit', textShadow: isActive ? '0 0 10px var(--marvel-green)' : 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {player.avatarUrl ? (
+                    <img src={player.avatarUrl} alt={player.name} style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', border: isActive ? '2px solid var(--marvel-green)' : '2px solid transparent' }} />
+                ) : (
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#4facfe', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold', border: isActive ? '2px solid var(--marvel-green)' : '2px solid transparent' }}>
+                        {player.name.charAt(0).toUpperCase()}
+                    </div>
+                )}
+                <span>{player.name}</span>
+                {isMe && <span style={{ color: 'var(--marvel-blue)', fontSize: '0.8rem', marginLeft: '4px' }}>(You)</span>}
             </h3>
             <div style={{ fontWeight: 'bold', color: 'var(--marvel-yellow)' }}>{player.points} VP</div>
         </div>

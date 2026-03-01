@@ -49,6 +49,7 @@ export interface Location {
 export interface Player {
   id: string;
   uuid?: string; // Stable ID for reconnection
+  avatarUrl?: string | null;
   name: string;
   tokens: TokenBank;
   hand: Card[]; // Reserved cards
