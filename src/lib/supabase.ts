@@ -117,10 +117,12 @@ export const isAnonymousUser = async (): Promise<boolean> => {
 // ── Google OAuth ────────────────────────────────────────────────────
 
 export const signInWithGoogle = async (): Promise<{ error: string | null }> => {
+    const siteUrl = import.meta.env.VITE_SITE_URL || window.location.origin;
+
     const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-            redirectTo: window.location.origin,
+            redirectTo: siteUrl,
         },
     });
 
