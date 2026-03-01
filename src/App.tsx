@@ -50,7 +50,21 @@ function App() {
 			}
 		});
 
-		return () => subscription.unsubscribe();
+		// Keep connection alive on tab awaken
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === 'visible') {
+				supabase.auth.getSession(); // Pings Supabase to wake up suspended connections
+			}
+		};
+
+		window.addEventListener('visibilitychange', handleVisibilityChange);
+		window.addEventListener('focus', handleVisibilityChange);
+
+		return () => {
+			subscription.unsubscribe();
+			window.removeEventListener('visibilitychange', handleVisibilityChange);
+			window.removeEventListener('focus', handleVisibilityChange);
+		};
 	}, []);
 
 	const { state, dispatch, mpState, hostGame, joinGame, closeLobby, leaveGame } = useGameEngine(playerUUID);

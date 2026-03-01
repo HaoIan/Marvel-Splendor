@@ -7,7 +7,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error('Missing Supabase Environment Variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+    },
+    realtime: {
+        params: {
+            eventsPerSecond: 10
+        }
+    }
+});
 
 /**
  * Local helper to upsert a profile row.
