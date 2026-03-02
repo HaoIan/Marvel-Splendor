@@ -17,21 +17,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         params: {
             eventsPerSecond: 10
         }
-    },
-    global: {
-        fetch: (url, options) => {
-            // Fix for idle suspension: force a timeout on all requests so they don't hang infinitely
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-            return fetch(url, { ...options, signal: controller.signal }).then((res) => {
-                clearTimeout(id);
-                return res;
-            }).catch((err) => {
-                clearTimeout(id);
-                throw err;
-            });
-        }
     }
 });
 
