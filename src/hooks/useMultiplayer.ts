@@ -4,6 +4,7 @@ import type { GameAction } from './gameReducer';
 import { gameReducer } from './gameReducer';
 import type { GameState } from '../types';
 import { saveMatchResult } from '../lib/matchResultService';
+import { withTimeout } from '../lib/profileService';
 
 export interface MultiplayerState {
     playerId: string | null; // My ID (used for turn checks)
@@ -93,148 +94,174 @@ export const useMultiplayer = (
             turnDeadline: turnLimitSeconds > 0 ? Date.now() + (turnLimitSeconds * 1000) : undefined
         };
 
-        const { data, error } = await supabase
-            .from('matches')
-            .insert([{ game_state: initialState }])
-            .select()
-            .single();
+        try {
+            const { data, error } = await withTimeout(
+                supabase
+                    .from('matches')
+                    .insert([{ game_state: initialState }])
+                    .select()
+                    .single()
+            );
 
-        if (error) {
-            console.error('Error creating game:', error);
-            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: error.message }));
+            if (error) {
+                console.error('Error creating game:', error);
+                setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: error.message }));
+                return;
+            }
+
+            joinGame(data.id, playerName, playerUUID, avatarUrl, true);
+        } catch (e) {
+            console.error('hostGame timed out or failed:', e);
+            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Network timeout. Please refresh.' }));
             return;
         }
-
-        joinGame(data.id, playerName, playerUUID, avatarUrl, true);
     };
 
     const joinGame = async (gameId: string, playerName: string, playerUUID: string, avatarUrl: string | null, isCreator = false) => {
         setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: undefined }));
 
-        // 1. Fetch current state
-        const { data, error } = await supabase
-            .from('matches')
-            .select('game_state')
-            .eq('id', gameId)
-            .single();
-
-        if (error || !data) {
-            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game not found' }));
-            localStorage.removeItem('splendor_gameId'); // Clear invalid
-            return;
-        }
-
-        let syncedState = data.game_state as GameState;
-
-        // Check if aborted
-        if (syncedState.status === 'ABORTED') {
-            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game was aborted by host.' }));
-            localStorage.removeItem('splendor_gameId');
-            return;
-        }
-
-        // Logic to add player (if new)
-        if (syncedState.status === 'LOBBY' || syncedState.status === 'PLAYING') {
-            const existingPlayerIndex = syncedState.players.findIndex(p => p.id === playerUUID);
-            if (existingPlayerIndex === -1) {
-                if (syncedState.players.length >= 4) {
-                    setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game full' }));
-                    return;
-                }
-                syncedState.players.push({
-                    id: playerUUID,
-                    name: playerName,
-                    avatarUrl,
-                    tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 } as any,
-                    hand: [],
-                    tableau: [],
-                    points: 0,
-                    isHuman: true
-                } as any);
-
-                await supabase
+        try {
+            // 1. Fetch current state
+            const { data, error } = await withTimeout(
+                supabase
                     .from('matches')
-                    .update({ game_state: syncedState })
-                    .eq('id', gameId);
+                    .select('game_state')
+                    .eq('id', gameId)
+                    .single()
+            );
+
+            if (error || !data) {
+                setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game not found' }));
+                localStorage.removeItem('splendor_gameId'); // Clear invalid
+                return;
             }
-        }
 
-        // 2. Subscribe
-        supabase
-            .channel(`game:${gameId}`)
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches', filter: `id=eq.${gameId}` }, (payload) => {
-                const newState = payload.new.game_state as GameState;
+            let syncedState = data.game_state as GameState;
 
-                if (newState.status === 'ABORTED') {
-                    alert("The Host has ended the game.");
-                    localStorage.removeItem('splendor_gameId');
-                    localStorage.removeItem('splendor_isHost');
-                    window.location.reload();
-                    return;
+            // Check if aborted
+            if (syncedState.status === 'ABORTED') {
+                setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game was aborted by host.' }));
+                localStorage.removeItem('splendor_gameId');
+                return;
+            }
+
+            // Logic to add player (if new)
+            if (syncedState.status === 'LOBBY' || syncedState.status === 'PLAYING') {
+                const existingPlayerIndex = syncedState.players.findIndex(p => p.id === playerUUID);
+                if (existingPlayerIndex === -1) {
+                    if (syncedState.players.length >= 4) {
+                        setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game full' }));
+                        return;
+                    }
+                    syncedState.players.push({
+                        id: playerUUID,
+                        name: playerName,
+                        avatarUrl,
+                        tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 } as any,
+                        hand: [],
+                        tableau: [],
+                        points: 0,
+                        isHuman: true
+                    } as any);
+
+                    await withTimeout(
+                        supabase
+                            .from('matches')
+                            .update({ game_state: syncedState })
+                            .eq('id', gameId)
+                    );
                 }
+            }
 
-                dispatch({ type: 'SYNC_STATE', state: newState });
+            // 2. Subscribe
+            supabase
+                .channel(`game:${gameId}`)
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches', filter: `id=eq.${gameId}` }, (payload) => {
+                    const newState = payload.new.game_state as GameState;
 
-                // Save match result on GAME_OVER (host only, once)
-                if (newState.status === 'GAME_OVER' && isCreator && !matchResultSavedRef.current) {
-                    matchResultSavedRef.current = true;
-                    saveMatchResult(gameId, newState);
-                }
-            })
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    // console.log("Realtime connected");
-                }
-            });
+                    if (newState.status === 'ABORTED') {
+                        alert("The Host has ended the game.");
+                        localStorage.removeItem('splendor_gameId');
+                        localStorage.removeItem('splendor_isHost');
+                        window.location.reload();
+                        return;
+                    }
 
-        dispatch({ type: 'SYNC_STATE', state: syncedState });
-
-        // 3. Polling Fallback (Every 3s)
-        const interval = setInterval(async () => {
-            const { data, error } = await supabase
-                .from('matches')
-                .select('game_state')
-                .eq('id', gameId)
-                .single();
-
-            if (data && !error) {
-                const remoteState = data.game_state as GameState;
-                if (remoteState.status === 'ABORTED') {
-                    alert("The Host has ended the game.");
-                    localStorage.removeItem('splendor_gameId');
-                    localStorage.removeItem('splendor_isHost');
-                    window.location.reload();
-                } else {
-                    dispatch({ type: 'SYNC_STATE', state: remoteState });
+                    dispatch({ type: 'SYNC_STATE', state: newState });
 
                     // Save match result on GAME_OVER (host only, once)
-                    if (remoteState.status === 'GAME_OVER' && isCreator && !matchResultSavedRef.current) {
+                    if (newState.status === 'GAME_OVER' && isCreator && !matchResultSavedRef.current) {
                         matchResultSavedRef.current = true;
-                        saveMatchResult(gameId, remoteState);
+                        saveMatchResult(gameId, newState);
                     }
-                }
+                })
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        // console.log("Realtime connected");
+                    }
+                });
+
+            dispatch({ type: 'SYNC_STATE', state: syncedState });
+
+            // 3. Polling Fallback (Every 3s)
+            const interval = setInterval(async () => {
+                try {
+                    const { data, error } = await withTimeout(
+                        supabase
+                            .from('matches')
+                            .select('game_state')
+                            .eq('id', gameId)
+                            .single(),
+                        2000
+                    );
+
+                    if (data && !error) {
+                        const remoteState = data.game_state as GameState;
+                        if (remoteState.status === 'ABORTED') {
+                            alert("The Host has ended the game.");
+                            localStorage.removeItem('splendor_gameId');
+                            localStorage.removeItem('splendor_isHost');
+                            window.location.reload();
+                        } else {
+                            dispatch({ type: 'SYNC_STATE', state: remoteState });
+
+                            // Save match result on GAME_OVER (host only, once)
+                            if (remoteState.status === 'GAME_OVER' && isCreator && !matchResultSavedRef.current) {
+                                matchResultSavedRef.current = true;
+                                saveMatchResult(gameId, remoteState);
+                            }
+                        }
+                    }
+                } catch (e) { /* Ignore polling timeouts quietly */ }
+            }, 3000);
+
+            if (pollingRef.current) clearInterval(pollingRef.current);
+            pollingRef.current = interval;
+
+            // Save session
+            localStorage.setItem('splendor_gameId', gameId);
+            localStorage.setItem('splendor_isHost', String(isCreator));
+            localStorage.setItem('splendor_playerName', playerName);
+            if (avatarUrl) {
+                localStorage.setItem('splendor_avatarUrl', avatarUrl);
+            } else {
+                localStorage.removeItem('splendor_avatarUrl');
             }
-        }, 3000);
 
-        if (pollingRef.current) clearInterval(pollingRef.current);
-        pollingRef.current = interval;
+            setMpState({
+                playerId: playerUUID,
+                gameId,
+                connectionStatus: 'connected',
+                isHost: isCreator
+            });
 
-        // Save session
-        localStorage.setItem('splendor_gameId', gameId);
-        localStorage.setItem('splendor_isHost', String(isCreator));
-        localStorage.setItem('splendor_playerName', playerName);
-        if (avatarUrl) {
-            localStorage.setItem('splendor_avatarUrl', avatarUrl);
-        } else {
-            localStorage.removeItem('splendor_avatarUrl');
+        } catch (e) {
+            console.error('joinGame timed out or failed:', e);
+            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Network timeout. Please refresh.' }));
+            localStorage.removeItem('splendor_gameId');
         }
 
-        setMpState({
-            playerId: playerUUID,
-            gameId,
-            connectionStatus: 'connected',
-            isHost: isCreator
-        });
+
     };
 
     const sendAction = async (action: GameAction) => {

@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 /**
  * Wraps a promise in a timeout so it doesn't hang infinitely if the tab sleeps and network dies.
  */
-const withTimeout = <T>(promise: PromiseLike<T>, ms: number = 10000): Promise<T> => {
+export const withTimeout = <T>(promise: PromiseLike<T>, ms: number = 10000): Promise<T> => {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
             reject(new Error(`Timeout after ${ms}ms`));
