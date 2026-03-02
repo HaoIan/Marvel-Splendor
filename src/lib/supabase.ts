@@ -7,6 +7,32 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error('Missing Supabase Environment Variables');
 }
 
+// Custom fetch with timeout and retry to prevent silent HTTP hangs
+const customFetch: typeof fetch = async (url, options) => {
+    const MAX_RETRIES = 1;
+    const TIMEOUT_MS = 8000; // 8 seconds timeout
+
+    for (let i = 0; i <= MAX_RETRIES; i++) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(id);
+            return response;
+        } catch (err: any) {
+            clearTimeout(id);
+            // If we timed out or network failed, we retry (e.g. broken keep-alive socket)
+            if (i < MAX_RETRIES) {
+                console.warn(`Fetch timeout/error, retrying... (${i + 1}/${MAX_RETRIES})`);
+                continue;
+            }
+            throw err;
+        }
+    }
+    throw new Error('Fetch failed'); // Should never be reached
+};
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         autoRefreshToken: true,
@@ -17,6 +43,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         params: {
             eventsPerSecond: 10
         }
+    },
+    global: {
+        fetch: customFetch
     }
 });
 
