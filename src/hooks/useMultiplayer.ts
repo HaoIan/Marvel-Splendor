@@ -172,28 +172,33 @@ export const useMultiplayer = (
 
         // 3. Polling Fallback (Every 3s)
         const interval = setInterval(async () => {
-            const { data, error } = await supabase
-                .from('matches')
-                .select('game_state')
-                .eq('id', gameId)
-                .single();
+            try {
+                const { data, error } = await supabase
+                    .from('matches')
+                    .select('game_state')
+                    .eq('id', gameId)
+                    .single();
 
-            if (data && !error) {
-                const remoteState = data.game_state as GameState;
-                if (remoteState.status === 'ABORTED') {
-                    alert("The Host has ended the game.");
-                    localStorage.removeItem('splendor_gameId');
-                    localStorage.removeItem('splendor_isHost');
-                    window.location.reload();
-                } else {
-                    dispatch({ type: 'SYNC_STATE', state: remoteState });
+                if (data && !error) {
+                    const remoteState = data.game_state as GameState;
+                    if (remoteState.status === 'ABORTED') {
+                        alert("The Host has ended the game.");
+                        localStorage.removeItem('splendor_gameId');
+                        localStorage.removeItem('splendor_isHost');
+                        window.location.reload();
+                    } else {
+                        dispatch({ type: 'SYNC_STATE', state: remoteState });
 
-                    // Save match result on GAME_OVER (host only, once)
-                    if (remoteState.status === 'GAME_OVER' && isCreator && !matchResultSavedRef.current) {
-                        matchResultSavedRef.current = true;
-                        saveMatchResult(gameId, remoteState);
+                        // Save match result on GAME_OVER (host only, once)
+                        if (remoteState.status === 'GAME_OVER' && isCreator && !matchResultSavedRef.current) {
+                            matchResultSavedRef.current = true;
+                            saveMatchResult(gameId, remoteState);
+                        }
                     }
                 }
+            } catch (e) {
+                console.warn("Polling fetch timeout. Attempting to wake connection...");
+                await supabase.auth.getSession(); // Force adapter wake
             }
         }, 3000);
 

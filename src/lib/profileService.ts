@@ -19,17 +19,28 @@ export interface MatchHistoryEntry {
 }
 
 export const getProfile = async (userId: string): Promise<Profile | null> => {
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+    let retries = 1;
+    while (retries >= 0) {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .maybeSingle();
 
-    if (error) {
-        console.error('Error fetching profile:', error);
-        return null;
+            if (error) {
+                console.error('Error fetching profile:', error);
+                return null;
+            }
+            return data as Profile | null;
+        } catch (e) {
+            console.warn(`Profile fetch timeout/error. Retrying... (${retries} left)`);
+            if (retries === 0) return null;
+            await supabase.auth.getSession();
+            retries--;
+        }
     }
-    return data as Profile | null;
+    return null;
 };
 
 export const upsertProfile = async (userId: string, displayName: string): Promise<Profile | null> => {
@@ -62,19 +73,30 @@ export const updateDisplayName = async (userId: string, displayName: string): Pr
 };
 
 export const getLeaderboard = async (limit: number = 20): Promise<Profile[]> => {
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .gt('games_played', 0)
-        .order('games_won', { ascending: false })
-        .order('games_played', { ascending: true })
-        .limit(limit);
+    let retries = 1;
+    while (retries >= 0) {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .gt('games_played', 0)
+                .order('games_won', { ascending: false })
+                .order('games_played', { ascending: true })
+                .limit(limit);
 
-    if (error) {
-        console.error('Error fetching leaderboard:', error);
-        return [];
+            if (error) {
+                console.error('Error fetching leaderboard:', error);
+                return [];
+            }
+            return (data || []) as Profile[];
+        } catch (e) {
+            console.warn(`Leaderboard fetch timeout/error. Retrying... (${retries} left)`);
+            if (retries === 0) return [];
+            await supabase.auth.getSession(); // Force connection wake
+            retries--;
+        }
     }
-    return (data || []) as Profile[];
+    return [];
 };
 
 export const incrementStats = async (userId: string, won: boolean): Promise<void> => {
