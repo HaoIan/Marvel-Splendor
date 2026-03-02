@@ -1,5 +1,26 @@
 import { supabase } from './supabase';
 
+/**
+ * Wraps a promise in a timeout so it doesn't hang infinitely if the tab sleeps and network dies.
+ */
+const withTimeout = <T>(promise: PromiseLike<T>, ms: number = 10000): Promise<T> => {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            reject(new Error(`Timeout after ${ms}ms`));
+        }, ms);
+
+        Promise.resolve(promise)
+            .then(value => {
+                clearTimeout(timer);
+                resolve(value);
+            })
+            .catch((reason: any) => {
+                clearTimeout(timer);
+                reject(reason);
+            });
+    });
+};
+
 export interface Profile {
     id: string;
     display_name: string;
@@ -19,29 +40,26 @@ export interface MatchHistoryEntry {
 }
 
 export const getProfile = async (userId: string): Promise<Profile | null> => {
-    let retries = 1;
-    while (retries >= 0) {
-        try {
-            const { data, error } = await supabase
+    try {
+        const { data, error } = await withTimeout(
+            supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
-                .maybeSingle();
+                .maybeSingle()
+        );
 
-            if (error) {
-                console.error('Error fetching profile:', error);
-                return null;
-            }
-            return data as Profile | null;
-        } catch (e) {
-            console.warn(`Profile fetch timeout/error. Retrying... (${retries} left)`);
-            if (retries === 0) return null;
-            await supabase.auth.getSession();
-            retries--;
+        if (error) {
+            console.error('Error fetching profile:', error);
+            return null;
         }
+        return data as Profile | null;
+    } catch (e) {
+        console.error('getProfile timed out or failed:', e);
+        return null;
     }
-    return null;
 };
+
 
 export const upsertProfile = async (userId: string, displayName: string): Promise<Profile | null> => {
     const { data, error } = await supabase
@@ -72,31 +90,27 @@ export const updateDisplayName = async (userId: string, displayName: string): Pr
     return data as Profile;
 };
 
-export const getLeaderboard = async (limit: number = 20): Promise<Profile[]> => {
-    let retries = 1;
-    while (retries >= 0) {
-        try {
-            const { data, error } = await supabase
+export const getLeaderboard = async (limit: number = 50): Promise<Profile[]> => {
+    try {
+        const { data, error } = await withTimeout(
+            supabase
                 .from('profiles')
                 .select('*')
                 .gt('games_played', 0)
                 .order('games_won', { ascending: false })
                 .order('games_played', { ascending: true })
-                .limit(limit);
+                .limit(limit)
+        );
 
-            if (error) {
-                console.error('Error fetching leaderboard:', error);
-                return [];
-            }
-            return (data || []) as Profile[];
-        } catch (e) {
-            console.warn(`Leaderboard fetch timeout/error. Retrying... (${retries} left)`);
-            if (retries === 0) return [];
-            await supabase.auth.getSession(); // Force connection wake
-            retries--;
+        if (error) {
+            console.error('Error fetching leaderboard:', error);
+            return [];
         }
+        return data as Profile[];
+    } catch (e) {
+        console.error('getLeaderboard timed out or failed:', e);
+        return [];
     }
-    return [];
 };
 
 export const incrementStats = async (userId: string, won: boolean): Promise<void> => {
