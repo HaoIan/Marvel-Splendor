@@ -4,7 +4,7 @@ import type { GameAction } from './gameReducer';
 import { gameReducer } from './gameReducer';
 import type { GameState } from '../types';
 import { saveMatchResult } from '../lib/matchResultService';
-import { withTimeout } from '../lib/profileService';
+import { withRetryAndTimeout } from '../lib/profileService';
 
 export interface MultiplayerState {
     playerId: string | null; // My ID (used for turn checks)
@@ -56,14 +56,22 @@ export const useMultiplayer = (
             if (document.visibilityState === 'visible' && mpState.gameId) {
                 // Tab woke up from sleep/background throttle, force immediate sync
                 console.log("Tab woke up, fetching latest state...");
-                const { data, error } = await supabase
-                    .from('matches')
-                    .select('game_state')
-                    .eq('id', mpState.gameId)
-                    .single();
+                try {
+                    const { data, error } = await withRetryAndTimeout(
+                        () => supabase
+                            .from('matches')
+                            .select('game_state')
+                            .eq('id', mpState.gameId)
+                            .single(),
+                        2000,
+                        2 // Allow up to 3 tries on wake-up to give the network stack time
+                    );
 
-                if (data && !error && data.game_state) {
-                    dispatch({ type: 'SYNC_STATE', state: data.game_state });
+                    if (data && !error && data.game_state) {
+                        dispatch({ type: 'SYNC_STATE', state: data.game_state });
+                    }
+                } catch (e) {
+                    console.log("Wake-up sync failed:", e);
                 }
             }
         };
@@ -95,8 +103,8 @@ export const useMultiplayer = (
         };
 
         try {
-            const { data, error } = await withTimeout(
-                supabase
+            const { data, error } = await withRetryAndTimeout(
+                () => supabase
                     .from('matches')
                     .insert([{ game_state: initialState }])
                     .select()
@@ -122,8 +130,8 @@ export const useMultiplayer = (
 
         try {
             // 1. Fetch current state
-            const { data, error } = await withTimeout(
-                supabase
+            const { data, error } = await withRetryAndTimeout(
+                () => supabase
                     .from('matches')
                     .select('game_state')
                     .eq('id', gameId)
@@ -164,8 +172,8 @@ export const useMultiplayer = (
                         isHuman: true
                     } as any);
 
-                    await withTimeout(
-                        supabase
+                    await withRetryAndTimeout(
+                        () => supabase
                             .from('matches')
                             .update({ game_state: syncedState })
                             .eq('id', gameId)
@@ -206,13 +214,14 @@ export const useMultiplayer = (
             // 3. Polling Fallback (Every 3s)
             const interval = setInterval(async () => {
                 try {
-                    const { data, error } = await withTimeout(
-                        supabase
+                    const { data, error } = await withRetryAndTimeout(
+                        () => supabase
                             .from('matches')
                             .select('game_state')
                             .eq('id', gameId)
                             .single(),
-                        2000
+                        2000,
+                        0 // Do not retry the polling queries, just let them fail
                     );
 
                     if (data && !error) {

@@ -1,20 +1,45 @@
 import { supabase } from './supabase';
 
 /**
- * Wraps a promise in a timeout so it doesn't hang infinitely if the tab sleeps and network dies.
+ * Wraps a promise-generating function with a timeout and automatic retry logic.
+ * This is crucial for fixing PWA/Mobile Safari background tab throttling where
+ * connections silently die and promises hang infinitely.
  */
-export const withTimeout = <T>(promise: PromiseLike<T>, ms: number = 10000): Promise<T> => {
+export const withRetryAndTimeout = <T>(
+    promiseFn: () => PromiseLike<T>,
+    ms: number = 8000,
+    retries: number = 1
+): Promise<T> => {
     return new Promise((resolve, reject) => {
+        let isResolved = false;
+
         const timer = setTimeout(() => {
-            reject(new Error(`Timeout after ${ms}ms`));
+            if (isResolved) return;
+            isResolved = true;
+
+            if (retries > 0) {
+                console.warn(`Request timed out. Retrying... (${retries} retries left)`);
+                // Wait slightly before retrying to allow network stack to fully awake
+                setTimeout(() => {
+                    withRetryAndTimeout(promiseFn, ms, retries - 1)
+                        .then(resolve)
+                        .catch(reject);
+                }, 500);
+            } else {
+                reject(new Error(`Timeout after ${ms}ms and all retries exhausted`));
+            }
         }, ms);
 
-        Promise.resolve(promise)
+        Promise.resolve(promiseFn())
             .then(value => {
+                if (isResolved) return;
+                isResolved = true;
                 clearTimeout(timer);
                 resolve(value);
             })
             .catch((reason: any) => {
+                if (isResolved) return;
+                isResolved = true;
                 clearTimeout(timer);
                 reject(reason);
             });
@@ -41,8 +66,8 @@ export interface MatchHistoryEntry {
 
 export const getProfile = async (userId: string): Promise<Profile | null> => {
     try {
-        const { data, error } = await withTimeout(
-            supabase
+        const { data, error } = await withRetryAndTimeout(
+            () => supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
@@ -92,8 +117,8 @@ export const updateDisplayName = async (userId: string, displayName: string): Pr
 
 export const getLeaderboard = async (limit: number = 50): Promise<Profile[]> => {
     try {
-        const { data, error } = await withTimeout(
-            supabase
+        const { data, error } = await withRetryAndTimeout(
+            () => supabase
                 .from('profiles')
                 .select('*')
                 .gt('games_played', 0)
