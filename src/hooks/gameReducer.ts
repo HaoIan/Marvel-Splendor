@@ -13,7 +13,8 @@ export type GameAction =
     | { type: 'RECONNECT_PLAYER'; oldId: string; newId: string }
     | { type: 'PASS_TURN'; expectedPlayerIndex?: number }
     | { type: 'SELECT_LOCATION'; locationId: string }
-    | { type: 'ABORT_GAME'; reason: string };
+    | { type: 'ABORT_GAME'; reason: string }
+    | { type: 'RESET_STATE' };
 
 // Shuffle helper
 const shuffle = (array: any[]) => {
@@ -97,6 +98,8 @@ const getCardFromMarket = (state: GameState, cardId: string): { card: Card, tier
 
 export const gameReducer = (state: GameState, action: GameAction): GameState => {
     switch (action.type) {
+        case 'RESET_STATE':
+            return createInitialState([{ id: 'p1', name: 'Player' }]);
         case 'SYNC_STATE':
             return action.state;
 

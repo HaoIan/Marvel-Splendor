@@ -1713,12 +1713,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                         View Board
                                     </button>
                                     <button onClick={() => {
-                                        sessionStorage.removeItem('splendor_gameState');
-                                        sessionStorage.removeItem('splendor_host');
-                                        sessionStorage.removeItem('splendor_gameId');
-                                        localStorage.removeItem('splendor_gameId');
-                                        localStorage.removeItem('splendor_isHost');
-                                        window.location.reload();
+                                        if (closeLobby) closeLobby();
+                                        dispatch({ type: 'RESET_STATE' });
                                     }} style={{ padding: '15px 30px', fontSize: '1.2rem', cursor: 'pointer', background: 'var(--marvel-blue)', color: 'white', border: 'none', borderRadius: '5px' }}>
                                         Return to Lobby
                                     </button>

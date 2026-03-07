@@ -191,7 +191,7 @@ export const useMultiplayer = (
                         alert("The Host has ended the game.");
                         localStorage.removeItem('splendor_gameId');
                         localStorage.removeItem('splendor_isHost');
-                        window.location.reload();
+                        dispatch({ type: 'RESET_STATE' });
                         return;
                     }
 
@@ -230,7 +230,7 @@ export const useMultiplayer = (
                             alert("The Host has ended the game.");
                             localStorage.removeItem('splendor_gameId');
                             localStorage.removeItem('splendor_isHost');
-                            window.location.reload();
+                            dispatch({ type: 'RESET_STATE' });
                         } else {
                             dispatch({ type: 'SYNC_STATE', state: remoteState });
 
@@ -315,7 +315,7 @@ export const useMultiplayer = (
         setMpState({ playerId: null, gameId: null, connectionStatus: 'idle', isHost: false });
         localStorage.removeItem('splendor_gameId');
         localStorage.removeItem('splendor_isHost');
-        window.location.reload();
+        dispatch({ type: 'RESET_STATE' });
     };
 
     const leaveGame = async () => {
@@ -345,7 +345,7 @@ export const useMultiplayer = (
         setMpState({ playerId: null, gameId: null, connectionStatus: 'idle', isHost: false });
         localStorage.removeItem('splendor_gameId');
         localStorage.removeItem('splendor_isHost');
-        window.location.reload();
+        dispatch({ type: 'RESET_STATE' });
     };
 
     return {
