@@ -4,6 +4,7 @@ import { supabase, signInAnonymously, signUpWithEmail, signInWithEmail, signOutU
 import { getProfile, getAvatarUrl, type Profile } from './lib/profileService';
 import './App.css';
 import { useGameEngine } from './hooks/useGameEngine';
+import { useWakeLock } from './hooks/useWakeLock';
 import { GameBoard } from './components/GameBoard';
 import { Leaderboard } from './components/Leaderboard';
 import { ProfilePage } from './components/ProfilePage';
@@ -194,6 +195,9 @@ function App() {
 	// Let's keep the lobby separate.
 	const showGame = isLocal || (mpState.connectionStatus === 'connected' && state.status !== 'LOBBY');
 	const showLobbyBoard = mpState.connectionStatus === 'connected' && state.status === 'LOBBY';
+
+	// Prevent the phone screen from sleeping while actively looking at the game board
+	useWakeLock(showGame);
 
 	const handleStartGame = () => {
 		// Dispatch Start Game
