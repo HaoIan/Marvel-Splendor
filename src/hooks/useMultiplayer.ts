@@ -1,8 +1,41 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { GameAction } from './gameReducer';
-import { gameReducer } from './gameReducer';
+import { gameReducer, createInitialState } from './gameReducer';
+import { createPlayer } from '../lib/gameRules';
 import type { GameState } from '../types';
+
+// PostgREST applies this predicate and update in one database statement.
+// JSON revisions also work for existing matches without a new database column.
+const writeMatch = async (gameId: string, previous: GameState, next: GameState) => {
+    const versioned = { ...next, revision: (previous.revision ?? 0) + 1 };
+    let query = supabase.from('matches').update({ game_state: versioned }).eq('id', gameId);
+    query = previous.revision === undefined
+        ? query.is('game_state->>revision', null)
+        : query.eq('game_state->>revision', previous.revision);
+    const { data, error } = await query.select('game_state');
+    if (error) throw new Error(error.message);
+    return data?.[0]?.game_state as GameState | undefined;
+};
+
+const readMatch = async (gameId: string): Promise<GameState> => {
+    const { data, error } = await supabase.from('matches').select('game_state').eq('id', gameId).single();
+    if (error || !data) throw new Error(error?.message || 'Game not found');
+    return data.game_state as GameState;
+};
+
+// Lobby changes can be recalculated after a conflict; gameplay actions must never
+// be replayed against a different turn or player.
+const changeMembership = async (gameId: string, change: (state: GameState) => GameState) => {
+    for (let attempt = 0; attempt < 4; attempt++) {
+        const previous = await readMatch(gameId);
+        const next = change(previous);
+        if (next === previous) return previous;
+        const saved = await writeMatch(gameId, previous, next);
+        if (saved) return saved;
+    }
+    throw new Error('The lobby changed. Please try again.');
+};
 
 export interface MultiplayerState {
     playerId: string | null; // My ID (used for turn checks)
@@ -24,28 +57,18 @@ export const useMultiplayer = (
         isHost: false
     });
 
-    const pollingRef = useRef<any>(null);
+    const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const gameStateRef = useRef(gameState);
     useEffect(() => {
         gameStateRef.current = gameState;
     }, [gameState]);
 
-    // Auto-reconnect based on storage
-    useEffect(() => {
-        if (!playerUUID) return; // Wait for Auth
-
-        const savedGameId = localStorage.getItem('splendor_gameId');
-        // const savedPlayerId = localStorage.getItem('splendor_playerUUID'); // Deprecated, use Auth ID
-        const savedIsHost = localStorage.getItem('splendor_isHost') === 'true';
-        const savedName = localStorage.getItem('splendor_playerName');
-
-        if (savedGameId && savedName) {
-            console.log("Restoring session:", savedGameId);
-            // We reuse joinGame logic, but need to be careful not to create loop
-            joinGame(savedGameId, savedName, playerUUID, savedIsHost);
-        }
-    }, [playerUUID]);
+    const syncState = useCallback((state: GameState, force = false) => {
+        if (!force && (state.revision ?? 0) < (gameStateRef.current.revision ?? 0)) return;
+        gameStateRef.current = state;
+        dispatch({ type: 'SYNC_STATE', state });
+    }, [dispatch]);
 
     // Cleanup subscription on unmount
     useEffect(() => {
@@ -63,13 +86,10 @@ export const useMultiplayer = (
     const hostGame = async (playerName: string, playerUUID: string, turnLimitSeconds: number = 60) => {
         setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: undefined }));
 
-        const defaultState = gameStateRef.current;
         const initialState = {
-            ...defaultState,
-            players: [{ id: playerUUID, name: playerName, tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 }, hand: [], tableau: [], points: 0, noble: null }],
-            status: 'LOBBY',
-            config: { turnLimitSeconds },
-            turnDeadline: turnLimitSeconds > 0 ? Date.now() + (turnLimitSeconds * 1000) : undefined
+            ...createInitialState([{ id: playerUUID, name: playerName, uuid: playerUUID }], { turnLimitSeconds }),
+            revision: 0,
+            turnDeadline: undefined
         };
 
         const { data, error } = await supabase
@@ -84,57 +104,25 @@ export const useMultiplayer = (
             return;
         }
 
-        joinGame(data.id, playerName, playerUUID, true);
+        await joinGame(data.id, playerName, playerUUID, true);
     };
 
-    const joinGame = async (gameId: string, playerName: string, playerUUID: string, isCreator = false) => {
+    const joinGame = useCallback(async (gameId: string, playerName: string, playerUUID: string, isCreator = false) => {
         setMpState(prev => ({ ...prev, connectionStatus: 'connecting', errorMessage: undefined }));
 
-        // 1. Fetch current state
-        const { data, error } = await supabase
-            .from('matches')
-            .select('game_state')
-            .eq('id', gameId)
-            .single();
-
-        if (error || !data) {
-            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game not found' }));
-            localStorage.removeItem('splendor_gameId'); // Clear invalid
-            return;
-        }
-
-        let syncedState = data.game_state as GameState;
-
-        // Check if aborted
-        if (syncedState.status === 'ABORTED') {
-            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game was aborted by host.' }));
+        let syncedState: GameState;
+        try {
+            syncedState = await changeMembership(gameId, state => {
+                if (state.status === 'ABORTED') throw new Error('Game was aborted by host.');
+                if (state.players.some(player => player.id === playerUUID)) return state;
+                if (state.status !== 'LOBBY') throw new Error('This game has already started.');
+                if (state.players.length >= 4) throw new Error('Game full');
+                return { ...state, players: [...state.players, createPlayer({ id: playerUUID, name: playerName, uuid: playerUUID })] };
+            });
+        } catch (error) {
+            setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: error instanceof Error ? error.message : 'Could not join game' }));
             localStorage.removeItem('splendor_gameId');
             return;
-        }
-
-        // Logic to add player (if new)
-        if (syncedState.status === 'LOBBY' || syncedState.status === 'PLAYING') {
-            const existingPlayerIndex = syncedState.players.findIndex(p => p.id === playerUUID);
-            if (existingPlayerIndex === -1) {
-                if (syncedState.players.length >= 4) {
-                    setMpState(prev => ({ ...prev, connectionStatus: 'error', errorMessage: 'Game full' }));
-                    return;
-                }
-                syncedState.players.push({
-                    id: playerUUID,
-                    name: playerName,
-                    tokens: { red: 0, blue: 0, green: 0, white: 0, black: 0, gold: 0 } as any,
-                    hand: [],
-                    tableau: [],
-                    points: 0,
-                    isHuman: true
-                } as any);
-
-                await supabase
-                    .from('matches')
-                    .update({ game_state: syncedState })
-                    .eq('id', gameId);
-            }
         }
 
         // 2. Subscribe
@@ -151,7 +139,7 @@ export const useMultiplayer = (
                     return;
                 }
 
-                dispatch({ type: 'SYNC_STATE', state: newState });
+                syncState(newState);
             })
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
@@ -159,7 +147,7 @@ export const useMultiplayer = (
                 }
             });
 
-        dispatch({ type: 'SYNC_STATE', state: syncedState });
+        syncState(syncedState, true);
 
         // 3. Polling Fallback (Every 3s)
         const interval = setInterval(async () => {
@@ -177,7 +165,7 @@ export const useMultiplayer = (
                     localStorage.removeItem('splendor_isHost');
                     window.location.reload();
                 } else {
-                    dispatch({ type: 'SYNC_STATE', state: remoteState });
+                    syncState(remoteState);
                 }
             }
         }, 3000);
@@ -196,42 +184,50 @@ export const useMultiplayer = (
             connectionStatus: 'connected',
             isHost: isCreator
         });
-    };
+    }, [syncState]);
 
-    const sendAction = async (action: GameAction) => {
+    // Auto-reconnect based on storage
+    useEffect(() => {
+        if (!playerUUID) return; // Wait for Auth
+
+        const savedGameId = localStorage.getItem('splendor_gameId');
+        // const savedPlayerId = localStorage.getItem('splendor_playerUUID'); // Deprecated, use Auth ID
+        const savedIsHost = localStorage.getItem('splendor_isHost') === 'true';
+        const savedName = localStorage.getItem('splendor_playerName');
+
+        if (savedGameId && savedName) {
+            console.log("Restoring session:", savedGameId);
+            // We reuse joinGame logic, but need to be careful not to create loop
+            joinGame(savedGameId, savedName, playerUUID, savedIsHost);
+        }
+    }, [playerUUID, joinGame]);
+
+    const sendAction = useCallback(async (action: GameAction) => {
         if (!mpState.gameId) return;
 
-        // Validation & Reducer Logic handled by checking against ref or just trying optimistic update
-        const prevState = gameStateRef.current;
+        const previous = gameStateRef.current;
         try {
-            const nextState = gameReducer(prevState, action);
-
-            // Optimistic Update: Update local UI immediately
-            dispatch(action);
-
-            const { error } = await supabase
-                .from('matches')
-                .update({ game_state: nextState })
-                .eq('id', mpState.gameId);
-
-            if (error) {
-                console.error("Failed to sync move:", error);
-                // If failed, we should theoretically rollback, but for now we just log.
-                // The next successful sync (if any) or reload would fix it.
+            const next = gameReducer(previous, action);
+            if (next === previous) return;
+            const saved = await writeMatch(mpState.gameId, previous, next);
+            if (!saved) {
+                syncState(await readMatch(mpState.gameId));
+                throw new Error('The game changed before your move was saved. Please try again.');
             }
-        } catch (e) {
-            console.error("Invalid move or reducer error", e);
+            // The reducer may shuffle or read the clock. Never reduce an action twice.
+            syncState(saved);
+            setMpState(prev => ({ ...prev, errorMessage: undefined }));
+        } catch (error) {
+            setMpState(prev => ({ ...prev, errorMessage: error instanceof Error ? error.message : 'Could not save move' }));
         }
-    };
+    }, [mpState.gameId, syncState]);
 
     const closeLobby = async () => {
         if (mpState.isHost && mpState.gameId) {
-            // Host Aborts
-            const abortedState = { ...gameStateRef.current, status: 'ABORTED' };
-            const { error } = await supabase.from('matches').update({ game_state: abortedState }).eq('id', mpState.gameId);
-            if (error) {
-                console.error("Error closing lobby:", error);
-                alert("Failed to close lobby: " + error.message);
+            try {
+                await changeMembership(mpState.gameId, state => ({ ...state, status: 'ABORTED' }));
+            } catch (error) {
+                alert('Failed to close lobby: ' + (error instanceof Error ? error.message : 'Unknown error'));
                 return;
             }
         }
@@ -246,24 +242,14 @@ export const useMultiplayer = (
     const leaveGame = async () => {
         if (!mpState.gameId || !mpState.playerId) return;
 
-        // 1. Get current state
-        const { data, error } = await supabase
-            .from('matches')
-            .select('game_state')
-            .eq('id', mpState.gameId)
-            .single();
-
-        if (data && !error) {
-            const currentState = data.game_state as GameState;
-            // 2. Remove player
-            const updatedPlayers = currentState.players.filter(p => p.id !== mpState.playerId);
-            const updatedState = { ...currentState, players: updatedPlayers };
-
-            // 3. Update DB
-            await supabase
-                .from('matches')
-                .update({ game_state: updatedState })
-                .eq('id', mpState.gameId);
+        try {
+            await changeMembership(mpState.gameId, state => {
+                if (state.status !== 'LOBBY') throw new Error('Cannot remove a player from a game that has started.');
+                return { ...state, players: state.players.filter(player => player.id !== mpState.playerId) };
+            });
+        } catch (error) {
+            setMpState(prev => ({ ...prev, errorMessage: error instanceof Error ? error.message : 'Could not leave game' }));
+            return;
         }
 
         // 4. Clear local

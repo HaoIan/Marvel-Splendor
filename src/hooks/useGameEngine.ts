@@ -1,4 +1,4 @@
-import { useReducer, useEffect } from 'react';
+import { useReducer, useEffect, useCallback } from 'react';
 import { gameReducer, createInitialState } from './gameReducer';
 import type { GameAction } from './gameReducer';
 import { useMultiplayer } from './useMultiplayer';
@@ -25,16 +25,16 @@ export const useGameEngine = (playerUUID?: string) => {
     // Custom dispatch wrapper to handle forwarding actions to Host if we are Client
     const { mpState, hostGame, joinGame, sendAction, closeLobby, leaveGame } = useMultiplayer(dispatch, state, playerUUID);
 
-    const matchDispatch = (action: GameAction) => {
+    const matchDispatch = useCallback((action: GameAction) => {
         // If we are connected to a game, we always "Send" the action.
-        // The sendAction function handles updating the DB (and optionally local optimistic update).
+        // sendAction saves the move before synchronizing the local state.
         if (mpState.connectionStatus === 'connected' && mpState.gameId) {
             sendAction(action);
         } else {
             // Local play (or lobby before connection)
             dispatch(action);
         }
-    };
+    }, [mpState.connectionStatus, mpState.gameId, sendAction]);
 
     return {
         state,

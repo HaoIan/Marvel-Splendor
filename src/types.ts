@@ -60,6 +60,7 @@ export interface Player {
 }
 
 export interface GameState {
+  revision?: number; // Persisted match version; absent in legacy matches.
   players: Player[];
   currentPlayerIndex: number;
   tokens: TokenBank;

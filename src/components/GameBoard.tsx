@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { GameState, Card as CardType, TokenBank, Player, Cost, Location } from '../types';
 import type { GameAction } from '../hooks/gameReducer';
 import { AnimationOverlay, type AnimationItem } from './AnimationOverlay';
 import { useSoundEffects } from '../hooks/useSoundEffects'; // Import Sound Hook
 import { v4 as uuidv4 } from 'uuid';
+import { calculatePayment, PAYMENT_COLORS } from '../lib/gameRules';
 
 // Card Back Assets
 import cardBack1 from '../assets/card-backs/card-back-1.png';
@@ -75,7 +76,7 @@ const Token = ({ color, count, onClick, size = 100, style }: { color: keyof Toke
 const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: { card: CardType, onClick: () => void, disabled?: boolean, canAfford?: boolean, noAnimate?: boolean, hideName?: boolean }) => {
     const bgImage = card.imageUrl || `${import.meta.env.BASE_URL}assets/hero-tier-${card.tier}.png`;
     const [animate, setAnimate] = useState(!noAnimate);
-    const [animDelay, setAnimDelay] = useState('0s');
+    const cardElementRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         // Match CSS animation duration
@@ -83,24 +84,21 @@ const CardView = ({ card, onClick, disabled, canAfford, noAnimate, hideName }: {
         return () => clearTimeout(timer);
     }, []);
 
-    // Sync animation delay when 'canAfford' changes
+    // Align the CSS pulse to the same clock when affordability changes.
     useEffect(() => {
-        if (canAfford) {
-            // Calculate delay to sync with global 2s cycle
-            // Use negative delay to start animation at correct phase immediately
-            const delay = -(Date.now() % 2000) + 'ms';
-            setAnimDelay(delay);
+        if (cardElementRef.current) {
+            cardElementRef.current.style.animationDelay = canAfford ? `${-(Date.now() % 2000)}ms` : '0s';
         }
     }, [canAfford]);
 
     return (
         <div
+            ref={cardElementRef}
             className={`card ${card.bonus} ${canAfford ? 'affordable' : ''} ${animate ? 'card-enter' : ''} ${disabled ? 'disabled' : ''}`}
             onClick={disabled ? undefined : onClick}
             style={{
                 cursor: disabled ? 'default' : 'pointer',
-                backgroundImage: `url(${bgImage})`,
-                animationDelay: canAfford ? animDelay : '0s'
+                backgroundImage: `url(${bgImage})`
             }}
         >
             <div className="card-header">
@@ -309,13 +307,16 @@ interface GameBoardProps {
     myUUID?: string | null; // Added for robust identity check
     closeLobby?: () => void;
     isHost?: boolean;
+    syncError?: string;
 }
 
-export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId, myUUID, closeLobby, isHost }) => {
+export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId, myUUID, closeLobby, isHost, syncError }) => {
     // Sound Effects
     const { playTokenSound, playRecruitSound, playReserveSound, playCardFlipSound, playErrorSound, playVictorySound, playTurnSound, playTickSound } = useSoundEffects();
 
     const isMyTurn = state.players[state.currentPlayerIndex].id === myPeerId || (myPeerId === null && state.currentPlayerIndex === 0);
+
+    const canAct = isMyTurn && !state.pendingLocationSelection?.length && state.status !== 'GAME_OVER';
 
     // Determine the viewing player (Me in multiplayer, or Current Player in hotseat)
     // Priority: 1. Match by ID (PeerID), 2. Match by UUID (Persistent Session), 3. Active Player
@@ -337,6 +338,99 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const [timeLeft, setTimeLeft] = useState(0);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
     const [showAvengersModal, setShowAvengersModal] = useState(false);
+
+    const [selectedTokens, setSelectedTokens] = useState<Partial<TokenBank>>({});
+    const [selectionPlayerIndex, setSelectionPlayerIndex] = useState(state.currentPlayerIndex);
+    if (selectionPlayerIndex !== state.currentPlayerIndex) {
+        setSelectionPlayerIndex(state.currentPlayerIndex);
+        setSelectedTokens({});
+    }
+    const selectedTokensRef = useRef(selectedTokens);
+    useEffect(() => {
+        selectedTokensRef.current = selectedTokens;
+    }, [selectedTokens]);
+    const [selectedCard, setSelectedCard] = useState<CardType | null>(null); // For Modal
+    const [animations, setAnimations] = useState<AnimationItem[]>([]);
+    const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
+
+    const triggerAnimation = useCallback((type: 'token' | 'card', content: string, startId: string, endId: string, backContent?: string, relatedCardId?: string) => {
+        const startEl = document.getElementById(startId);
+        const endEl = document.getElementById(endId);
+        if (!startEl || !endEl) return;
+
+        const startRect = startEl.getBoundingClientRect();
+
+        // Calculate a centered target rect to avoid expanding to the full container size
+        // If animating to market (endId includes 'market-card'), use full size (120x168)
+        // If animating to location (endId includes 'location-tile'), use full size (130x130)
+        // If animating FROM location (startId includes 'location-tile'), use scaled down square (65x65)
+        // If token, use 35x35. Else (player area), use 60x84.
+
+        // Dynamically measure target size if possible to respect CSS transforms (e.g. mobile scaling)
+        let realEndEl = endEl;
+        // Check for specific inner elements that dictate the visual size
+        if (endId.includes('market-card') || endId.includes('location-tile')) {
+            const inner = endEl.querySelector('.card');
+            if (inner) realEndEl = inner as HTMLElement;
+        }
+
+        let rect = realEndEl.getBoundingClientRect();
+
+        // Fallback for hidden elements (mobile player panel collapsed)
+        if (rect.width === 0 && rect.height === 0) {
+            const fallbackEl = document.getElementById('mobile-player-summary-bar');
+            if (fallbackEl) {
+                rect = fallbackEl.getBoundingClientRect();
+            }
+        }
+
+        let targetWidth: number;
+        let targetHeight: number;
+
+        if (endId.includes('player-area')) {
+            // Special case: Player Area = generic target. Use fixed mini size.
+            // Maintain logic: From Location -> 65x65 (Square), From Market -> 60x84 (Card)
+            const isLocationSource = startId.includes('location-tile');
+            targetWidth = isLocationSource ? 65 : 60;
+            targetHeight = isLocationSource ? 65 : 84;
+        } else if (endId.includes('token-bank')) {
+            // Token bank should match the element size
+            targetWidth = rect.width;
+            targetHeight = rect.height;
+        } else {
+            // Default: Trust the element's size (Market cards, Locations, Decks)
+            // This picks up the scale(0.85) on mobile automatically
+            targetWidth = rect.width;
+            targetHeight = rect.height;
+        }
+
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        const endRect = {
+            left: centerX - targetWidth / 2,
+            top: centerY - targetHeight / 2,
+            width: targetWidth,
+            height: targetHeight,
+            bottom: centerY + targetHeight / 2,
+            right: centerX + targetWidth / 2,
+            x: centerX - targetWidth / 2,
+            y: centerY - targetHeight / 2,
+            toJSON: () => { }
+        } as DOMRect;
+
+        const newItem: AnimationItem = {
+            id: uuidv4(),
+            type,
+            content,
+            startRect,
+            endRect,
+            duration: 800, // 0.8s flight
+            backContent, // Optional for flip
+            relatedCardId
+        };
+        setAnimations(prev => [...prev, newItem]);
+    }, []);
 
     // Auto-acquire single location with delay for animation
     useEffect(() => {
@@ -364,26 +458,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 if (dispatchTimer) clearTimeout(dispatchTimer);
             };
         }
-    }, [state.pendingLocationSelection, state.currentPlayerIndex, isMyTurn, dispatch, playRecruitSound]);
+    }, [state.pendingLocationSelection, state.currentPlayerIndex, isMyTurn, dispatch, playRecruitSound, state.players, triggerAnimation]);
 
     // Toast Notification Logic
     const [toastMsg, setToastMsg] = useState<{ msg: string, type: 'info' | 'error' | 'success' } | null>(null);
-    const prevLogLength = useRef(state.logs.length);
-
-    useEffect(() => {
-        if (state.logs.length > prevLogLength.current) {
+    const [prevLogLength, setPrevLogLength] = useState(state.logs.length);
+    if (state.logs.length !== prevLogLength) {
+        setPrevLogLength(state.logs.length);
+        if (state.logs.length > prevLogLength) {
             const lastLog = state.logs[state.logs.length - 1];
-            // Check for location acquisition
-            if (lastLog.includes('took location')) {
-                setToastMsg({ msg: lastLog, type: 'success' });
-            }
-            // Check for Avengers tile
-            if (lastLog.includes('Avengers Assemble tile')) {
+            if (lastLog.includes('took location') || lastLog.includes('Avengers Assemble tile')) {
                 setToastMsg({ msg: lastLog, type: 'success' });
             }
         }
-        prevLogLength.current = state.logs.length;
-    }, [state.logs]);
+    }
 
     // Avengers Tile Animation Latch
     const prevAvengersOwnerIdRef = useRef<string | null | undefined>(state.avengersTileOwnerId);
@@ -392,18 +480,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     useEffect(() => {
         const currentOwner = state.avengersTileOwnerId;
         const prevOwner = prevAvengersOwnerIdRef.current;
+        let animationFrame: number | undefined;
 
         // Condition: New valid owner, and different from previous (including null -> owner)
         if (currentOwner && currentOwner !== prevOwner) {
             const startId = prevOwner ? `player-area-${prevOwner}` : 'locations-row';
             const endId = `player-area-${currentOwner}`;
 
-            triggerAnimation('card', avengersTileImg, startId, endId);
-            playRecruitSound();
+            animationFrame = requestAnimationFrame(() => {
+                triggerAnimation('card', avengersTileImg, startId, endId);
+                playRecruitSound();
+            });
         }
 
         prevAvengersOwnerIdRef.current = currentOwner;
-    }, [state.avengersTileOwnerId, playRecruitSound]);
+        return () => {
+            if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+        };
+    }, [state.avengersTileOwnerId, playRecruitSound, triggerAnimation]);
 
     // Auto-clear toastMsg
     useEffect(() => {
@@ -484,21 +578,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         updateTimer(); // Initial call
 
         return () => clearInterval(timer);
-    }, [state.turnDeadline, state.currentPlayerIndex, dispatch, playTickSound, isMyTurn]);
+    }, [state.turnDeadline, state.currentPlayerIndex, dispatch, playTickSound, isMyTurn, isHost, state.lastActionAt, state.players, state.status, playTokenSound, triggerAnimation]);
 
     const totalSeconds = state.config.turnLimitSeconds;
     const percentage = Math.max(0, Math.min(1, timeLeft / totalSeconds));
     const dynamicColor = getTimerColor(percentage);
 
-
-    const [selectedTokens, setSelectedTokens] = useState<Partial<TokenBank>>({});
-    const selectedTokensRef = useRef(selectedTokens);
-    useEffect(() => {
-        selectedTokensRef.current = selectedTokens;
-    }, [selectedTokens]);
-    const [selectedCard, setSelectedCard] = useState<CardType | null>(null); // For Modal
-    const [animations, setAnimations] = useState<AnimationItem[]>([]);
-    const [hiddenCardIds, setHiddenCardIds] = useState<Set<string>>(new Set());
 
     // Track previous market state to detect new cards
     const prevMarketRef = React.useRef(state.market);
@@ -540,7 +625,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     const notifiedWinnersRef = useRef<Set<string>>(new Set());
 
     // Track cards that have just arrived via animation to suppress default entry animation
-    const justArrivedIdsRef = useRef<Set<string>>(new Set());
+    const [justArrivedIds, setJustArrivedIds] = useState<Set<string>>(new Set());
 
     // Check for winning condition (>= 16 points AND has Time Stone)
     useEffect(() => {
@@ -604,7 +689,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 // but since we are just hiding, the element ID still exists (it's properties that changed).
                 // Actually, if we hide it, we replace it with a placeholder div with the SAME ID (see render loop).
                 // So the ID is present in the DOM.
-                justArrivedIdsRef.current.add(card.id);
+                setJustArrivedIds(prev => new Set(prev).add(card.id));
                 requestAnimationFrame(() => {
                     playCardFlipSound(); // Sound on flip
                     triggerAnimation('card', frontImage, deckId, cardId, CARD_BACKS[tier], card.id);
@@ -612,92 +697,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             });
         });
         prevMarketRef.current = state.market;
-    }, [state.market]);
+    }, [state.market, playCardFlipSound, triggerAnimation]);
 
     // Animate Locations entering the board (Start of Game)
     React.useLayoutEffect(() => {
         // No animation for locations to match Avenger tile behavior
         prevLocationsRef.current = state.locations || [];
     }, [state.locations]);
-
-    const triggerAnimation = (type: 'token' | 'card', content: string, startId: string, endId: string, backContent?: string, relatedCardId?: string) => {
-        const startEl = document.getElementById(startId);
-        const endEl = document.getElementById(endId);
-        if (!startEl || !endEl) return;
-
-        const startRect = startEl.getBoundingClientRect();
-
-        // Calculate a centered target rect to avoid expanding to the full container size
-        // If animating to market (endId includes 'market-card'), use full size (120x168)
-        // If animating to location (endId includes 'location-tile'), use full size (130x130)
-        // If animating FROM location (startId includes 'location-tile'), use scaled down square (65x65)
-        // If token, use 35x35. Else (player area), use 60x84.
-
-        // Dynamically measure target size if possible to respect CSS transforms (e.g. mobile scaling)
-        let realEndEl = endEl;
-        // Check for specific inner elements that dictate the visual size
-        if (endId.includes('market-card') || endId.includes('location-tile')) {
-            const inner = endEl.querySelector('.card');
-            if (inner) realEndEl = inner as HTMLElement;
-        }
-
-        let rect = realEndEl.getBoundingClientRect();
-
-        // Fallback for hidden elements (mobile player panel collapsed)
-        if (rect.width === 0 && rect.height === 0) {
-            const fallbackEl = document.getElementById('mobile-player-summary-bar');
-            if (fallbackEl) {
-                rect = fallbackEl.getBoundingClientRect();
-            }
-        }
-
-        let targetWidth: number;
-        let targetHeight: number;
-
-        if (endId.includes('player-area')) {
-            // Special case: Player Area = generic target. Use fixed mini size.
-            // Maintain logic: From Location -> 65x65 (Square), From Market -> 60x84 (Card)
-            const isLocationSource = startId.includes('location-tile');
-            targetWidth = isLocationSource ? 65 : 60;
-            targetHeight = isLocationSource ? 65 : 84;
-        } else if (endId.includes('token-bank')) {
-            // Token bank should match the element size
-            targetWidth = rect.width;
-            targetHeight = rect.height;
-        } else {
-            // Default: Trust the element's size (Market cards, Locations, Decks)
-            // This picks up the scale(0.85) on mobile automatically
-            targetWidth = rect.width;
-            targetHeight = rect.height;
-        }
-
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-
-        const endRect = {
-            left: centerX - targetWidth / 2,
-            top: centerY - targetHeight / 2,
-            width: targetWidth,
-            height: targetHeight,
-            bottom: centerY + targetHeight / 2,
-            right: centerX + targetWidth / 2,
-            x: centerX - targetWidth / 2,
-            y: centerY - targetHeight / 2,
-            toJSON: () => { }
-        } as DOMRect;
-
-        const newItem: AnimationItem = {
-            id: uuidv4(),
-            type,
-            content,
-            startRect,
-            endRect,
-            duration: 800, // 0.8s flight
-            backContent, // Optional for flip
-            relatedCardId
-        };
-        setAnimations(prev => [...prev, newItem]);
-    };
 
     const handleAnimationComplete = (id: string) => {
         setAnimations(prev => {
@@ -721,17 +727,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
         });
     };
 
-    // Reset selected tokens when turn changes
-    useEffect(() => {
-        setSelectedTokens({});
-    }, [state.currentPlayerIndex]);
-
     const handleTakeToken = (color: keyof TokenBank) => {
         if (state.status === 'GAME_OVER') {
             setToast({ message: "Game is over!", type: 'info' });
             return;
         }
-        if (!isMyTurn) return; // Silent return for tokens selection out of turn to rely on confirm button disabled state? 
+        if (!canAct) return;
         // Actually, previous logic just returned silently. Let's keep it consistent or verify if we want feedback.
         // User asked "disallow changes... with corresponding feedback" generally. 
         // For tokens, selection is local state until confirmed. 
@@ -782,6 +783,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
     };
 
     const confirmTakeTokens = () => {
+        if (!canAct) return;
         if (state.status === 'GAME_OVER') {
             setToast({ message: "Game is over!", type: 'info' });
             return;
@@ -827,31 +829,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
 
     // Validation for Recruitment
     const canAfford = (card: CardType) => {
-        // Allow check anytime so we can see costs
-        const player = viewingPlayer;
-
-        // Calculate Cost
-        const discount: Record<string, number> = { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0 };
-        player.tableau.forEach(c => {
-            if (c.bonus && discount[c.bonus] !== undefined) discount[c.bonus]++;
-        });
-
-        const cost = card.cost;
-        let goldNeeded = 0;
-        let goldAvailable = player.tokens.gray;
-
-        for (const c of ['red', 'blue', 'yellow', 'purple', 'orange'] as const) {
-            const val = cost[c as keyof Cost] || 0;
-            const effectiveCost = Math.max(0, val - (discount[c] || 0));
-            if (player.tokens[c] < effectiveCost) {
-                goldNeeded += (effectiveCost - player.tokens[c]);
-            }
-        }
-
-        return goldAvailable >= goldNeeded;
+        return calculatePayment(viewingPlayer, card).canAfford;
     };
 
     const handleAction = (type: 'RECRUIT' | 'RESERVE') => {
+        if (state.pendingLocationSelection?.length) {
+            setToast({ message: 'Choose a location before making another move.', type: 'info' });
+            return;
+        }
         if (state.status === 'GAME_OVER') {
             setToast({ message: "The game has ended. You cannot make moves.", type: 'info' });
             playErrorSound();
@@ -925,23 +910,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                     <button
                         onClick={confirmTakeTokens}
                         className="btn-primary"
-                        disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
+                        disabled={!canAct || Object.keys(selectedTokens).length === 0}
                         style={{
                             padding: '8px 16px',
                             fontSize: '0.9rem',
-                            opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
-                            cursor: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 'not-allowed' : 'pointer',
+                            opacity: (!canAct || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
+                            cursor: (!canAct || Object.keys(selectedTokens).length === 0) ? 'not-allowed' : 'pointer',
                         }}
                     >
                         Confirm
                     </button>
                     <button
                         onClick={() => setSelectedTokens({})}
-                        disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
+                        disabled={!canAct || Object.keys(selectedTokens).length === 0}
                         style={{
                             background: '#444', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '4px', fontSize: '0.9rem',
-                            opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
-                            cursor: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 'not-allowed' : 'pointer',
+                            opacity: (!canAct || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
+                            cursor: (!canAct || Object.keys(selectedTokens).length === 0) ? 'not-allowed' : 'pointer',
                         }}
                     >
                         Reset
@@ -955,11 +940,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                 }
                             });
                         }}
-                        disabled={!isMyTurn}
+                        disabled={!canAct}
                         style={{
                             background: 'var(--marvel-red)', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '4px', fontSize: '0.9rem',
-                            opacity: !isMyTurn ? 0.5 : 1,
-                            cursor: !isMyTurn ? 'not-allowed' : 'pointer'
+                            opacity: !canAct ? 0.5 : 1,
+                            cursor: !canAct ? 'not-allowed' : 'pointer'
                         }}
                     >
                         Pass
@@ -1018,9 +1003,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
             )}
 
             {/* Custom Toast */}
-            {toast && (
-                <div className={`toast-notification ${toast.type}`}>
-                    {toast.message}
+            {(syncError || toast) && (
+                <div role="alert" className={`toast-notification ${syncError ? 'error' : toast?.type}`}>
+                    {syncError || toast?.message}
                 </div>
             )}
 
@@ -1063,22 +1048,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                 <div className="action-buttons">
                     <button
                         onClick={confirmTakeTokens}
-                        disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
+                        disabled={!canAct || Object.keys(selectedTokens).length === 0}
                         style={{
                             background: 'linear-gradient(135deg, var(--marvel-blue), var(--marvel-purple))',
                             color: 'white',
-                            opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
+                            opacity: (!canAct || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
                         }}
                     >
                         Confirm
                     </button>
                     <button
                         onClick={() => setSelectedTokens({})}
-                        disabled={!isMyTurn || Object.keys(selectedTokens).length === 0}
+                        disabled={!canAct || Object.keys(selectedTokens).length === 0}
                         style={{
                             background: '#444',
                             color: 'white',
-                            opacity: (!isMyTurn || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
+                            opacity: (!canAct || Object.keys(selectedTokens).length === 0) ? 0.5 : 1,
                         }}
                     >
                         Reset
@@ -1090,11 +1075,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                 onConfirm: () => dispatch({ type: 'PASS_TURN', expectedPlayerIndex: state.currentPlayerIndex })
                             });
                         }}
-                        disabled={!isMyTurn}
+                        disabled={!canAct}
                         style={{
                             background: 'var(--marvel-red)',
                             color: 'white',
-                            opacity: !isMyTurn ? 0.5 : 1,
+                            opacity: !canAct ? 0.5 : 1,
                         }}
                     >
                         Pass
@@ -1236,7 +1221,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                     {hiddenCardIds.has(card.id) ? (
                                         <div className="card" style={{ width: '120px', height: '168px', visibility: 'hidden' }}></div> // Transparent placeholder
                                     ) : (
-                                        <CardView card={card} onClick={() => handleCardClick(card)} canAfford={canAfford(card)} noAnimate={justArrivedIdsRef.current.has(card.id)} />
+                                        <CardView card={card} onClick={() => handleCardClick(card)} canAfford={canAfford(card)} noAnimate={justArrivedIds.has(card.id)} />
                                     )}
                                 </div>
                             ))}
@@ -1368,99 +1353,29 @@ export const GameBoard: React.FC<GameBoardProps> = ({ state, dispatch, myPeerId,
                                     return <button disabled style={{ padding: '12px 24px', background: '#555', color: '#aaa', border: 'none', borderRadius: '8px', cursor: 'not-allowed' }}>Already Owned</button>;
                                 }
 
-                                const missing = (() => {
-                                    if (canAfford(selectedCard)) return null;
-
-                                    const discount: Record<string, number> = { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0 };
-                                    player.tableau.forEach(c => {
-                                        if (c.bonus && discount[c.bonus] !== undefined) discount[c.bonus]++;
-                                    });
-
-                                    const cost = selectedCard.cost;
-                                    let goldNeeded = 0;
-                                    let goldAvailable = player.tokens.gray;
-                                    const missingCounts: string[] = [];
-
-                                    for (const c of ['red', 'blue', 'yellow', 'purple', 'orange'] as const) {
-                                        const val = cost[c as keyof Cost] || 0;
-                                        const effectiveCost = Math.max(0, val - (discount[c] || 0));
-                                        if (player.tokens[c] < effectiveCost) {
-                                            const diff = effectiveCost - player.tokens[c];
-                                            goldNeeded += diff;
-                                            // We don't list color missing if we can cover with gold, 
-                                            // but if we can't cover with gold, we should show what's missing.
-                                            // Actually, simplest is to just show total missing value after gold application?
-                                            // Or show specific colors missing assuming gold is used optimally?
-                                            // Let's show raw missing colors first.
-                                            missingCounts.push(`${diff} ${c.charAt(0).toUpperCase() + c.slice(1)}`);
-                                        }
-                                    }
-
-                                    if (goldAvailable >= goldNeeded) return null; // Should be caught by canAfford
-
-                                    // If we are here, goldAvailable < goldNeeded.
-                                    // We want to show exactly what is missing.
-                                    // Since gold can cover anything, we can't be 100% precise on WHICH color is missing if we have some gold but not enough.
-                                    // But listing the raw missing amounts is the most helpful.
-                                    // Example: Missing 2 Red, 1 Blue. (Have 1 Gold).
-                                    // User knows they need 2 more gems total.
-
-                                    const missingStr = missingCounts.join(', ');
-                                    return `Missing: ${missingStr}`;
-                                })();
+                                const { payment, shortfall, canAfford: affordable } = calculatePayment(player, selectedCard);
+                                const missing = Object.entries(shortfall).map(([color, count]) =>
+                                    `${count} ${color.charAt(0).toUpperCase() + color.slice(1)}`
+                                ).join(', ');
+                                const pay = PAYMENT_COLORS.filter(color => payment[color] > 0).map(color =>
+                                    `${payment[color]} ${color.charAt(0).toUpperCase() + color.slice(1)}`
+                                );
+                                if (payment.gray > 0) pay.push(`${payment.gray} Shield`);
 
                                 return (
                                     <>
-                                        {canAfford(selectedCard) ? (
-                                            <button className="btn-primary" onClick={() => handleAction('RECRUIT')}>
-                                                {(() => {
-                                                    // Calculate what actually needs to be paid
-                                                    const discount: Record<string, number> = { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0 };
-                                                    player.tableau.forEach(c => {
-                                                        if (c.bonus && discount[c.bonus] !== undefined) discount[c.bonus]++;
-                                                    });
-
-                                                    const cost = selectedCard.cost;
-                                                    const pay: string[] = [];
-                                                    let goldToPay = 0;
-
-                                                    // First pass: what can we pay with regular tokens?
-                                                    for (const c of ['red', 'blue', 'yellow', 'purple', 'orange'] as const) {
-                                                        const val = cost[c as keyof Cost] || 0;
-                                                        const effectiveCost = Math.max(0, val - (discount[c] || 0));
-
-                                                        if (effectiveCost > 0) {
-                                                            // We need to pay 'effectiveCost'.
-                                                            // We use tokens first, then gold.
-                                                            const tokenAvailable = player.tokens[c];
-                                                            if (tokenAvailable >= effectiveCost) {
-                                                                pay.push(`${effectiveCost} ${c.charAt(0).toUpperCase() + c.slice(1)}`);
-                                                            } else {
-                                                                // Pay all tokens, rest gold
-                                                                if (tokenAvailable > 0) {
-                                                                    pay.push(`${tokenAvailable} ${c.charAt(0).toUpperCase() + c.slice(1)}`);
-                                                                }
-                                                                goldToPay += (effectiveCost - tokenAvailable);
-                                                            }
-                                                        }
-                                                    }
-
-                                                    if (goldToPay > 0) {
-                                                        pay.push(`${goldToPay} Shield`);
-                                                    }
-
-                                                    if (pay.length === 0) return "Recruit (Free)";
-                                                    return `Recruit (${pay.join(', ')})`;
-                                                })()}
+                                        {affordable ? (
+                                            <button className="btn-primary" disabled={!canAct} onClick={() => handleAction('RECRUIT')}>
+                                                {pay.length ? `Recruit (${pay.join(', ')})` : 'Recruit (Free)'}
                                             </button>
                                         ) : (
                                             <button disabled style={{ padding: '12px 24px', background: '#555', color: '#aaa', border: 'none', borderRadius: '8px', cursor: 'not-allowed' }}>
-                                                {missing ? missing : "Cannot Afford"}
+                                                {missing ? `Missing: ${missing}` : "Cannot Afford"}
                                             </button>
                                         )}
                                         {!isReserved && (
                                             player.hand.length < 3 ? (
-                                                <button className="btn-primary" style={{ filter: 'hue-rotate(90deg)' }} onClick={() => handleAction('RESERVE')}>Reserve</button>
+                                                <button className="btn-primary" style={{ filter: 'hue-rotate(90deg)' }} disabled={!canAct} onClick={() => handleAction('RESERVE')}>Reserve</button>
                                             ) : (
                                                 <button disabled style={{ padding: '12px 24px', background: '#555', color: '#aaa', border: 'none', borderRadius: '8px', cursor: 'not-allowed' }}>
                                                     Max Reserved (3)

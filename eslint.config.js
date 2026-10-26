@@ -6,7 +6,8 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // The untracked nested checkout is a separate copy of this app.
+  globalIgnores(['dist', 'Marvel-Splendor/**']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

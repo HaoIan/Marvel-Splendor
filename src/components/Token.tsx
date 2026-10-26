@@ -10,7 +10,7 @@ import soulToken from '../assets/tokens/soul-token.png';
 import spaceToken from '../assets/tokens/space-token.png';
 import timeToken from '../assets/tokens/time-token.png';
 
-export const TOKEN_IMAGES: Record<string, string> = {
+const TOKEN_IMAGES: Record<string, string> = {
     yellow: mindToken,
     purple: powerToken,
     red: realityToken,

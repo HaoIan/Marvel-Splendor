@@ -7,7 +7,9 @@ export const useSoundEffects = () => {
     useEffect(() => {
         const initAudio = () => {
             if (!audioCtxRef.current) {
-                audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+                if (!AudioContextClass) return;
+                audioCtxRef.current = new AudioContextClass();
             } else if (audioCtxRef.current.state === 'suspended') {
                 audioCtxRef.current.resume();
             }

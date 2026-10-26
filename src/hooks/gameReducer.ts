@@ -1,6 +1,7 @@
 import type { GameState, Player, TokenBank, Card, Cost, Location } from '../types';
 import { INITIAL_DECK } from '../data/cards';
 import { LOCATION_TILES } from '../data/locations';
+import { createPlayer, calculatePayment } from '../lib/gameRules';
 
 export type GameAction =
     | { type: 'TAKE_TOKENS'; tokens: TokenBank }
@@ -16,7 +17,7 @@ export type GameAction =
     | { type: 'ABORT_GAME'; reason: string };
 
 // Shuffle helper
-const shuffle = (array: any[]) => {
+const shuffle = <T,>(array: T[]): T[] => {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
@@ -40,18 +41,7 @@ export const createInitialState = (
         3: deck3.splice(0, 4),
     };
 
-    const players: Player[] = playerConfig.map(cfg => ({
-        id: cfg.id,
-        name: cfg.name,
-        uuid: cfg.uuid,
-        tokens: { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0, green: 0, gray: 0 },
-        hand: [],
-        tableau: [],
-        nobles: [],
-        locations: [],
-        points: 0,
-        isHuman: true
-    }));
+    const players = playerConfig.map(createPlayer);
 
     // Standard setup: 2p->4, 3p->5, 4p->7
     const bankSize = playerConfig.length === 2 ? 4 : playerConfig.length === 3 ? 5 : 7;
@@ -63,7 +53,7 @@ export const createInitialState = (
     const selectedTiles = shuffle([...LOCATION_TILES]).slice(0, numPlayers);
 
     // For each tile, randomly pick side A or side B
-    const locations: Location[] = selectedTiles.map((tile: any) => {
+    const locations: Location[] = selectedTiles.map(tile => {
         return Math.random() < 0.5 ? tile.sideA : tile.sideB;
     });
 
@@ -95,6 +85,9 @@ const getCardFromMarket = (state: GameState, cardId: string): { card: Card, tier
 };
 
 export const gameReducer = (state: GameState, action: GameAction): GameState => {
+    if (state.pendingLocationSelection?.length &&
+        ['TAKE_TOKENS', 'RECRUIT_CARD', 'RESERVE_CARD', 'END_TURN'].includes(action.type)) return state;
+
     switch (action.type) {
         case 'SYNC_STATE':
             return action.state;
@@ -168,37 +161,13 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
 
             if (!card) return state;
 
-            // Calculate Cost
-            // 1. Discount from Tableau
-            const discount: Record<string, number> = { red: 0, blue: 0, yellow: 0, purple: 0, orange: 0 };
-            player.tableau.forEach(c => {
-                if (c.bonus && discount[c.bonus] !== undefined) discount[c.bonus]++;
-            });
-
-            // 2. Pay tokens
-            const cost = card.cost;
+            const { payment, canAfford } = calculatePayment(player, card);
+            if (!canAfford) return state;
             const newBank = { ...state.tokens };
-            let goldNeeded = 0;
-
-            (Object.keys(cost) as (keyof TokenBank)[]).forEach(color => {
-                const needed = (cost[color as keyof Cost] || 0);
-                const distcountedNeeded = Math.max(0, needed - (discount[color] || 0));
-
-                if (player.tokens[color] >= distcountedNeeded) {
-                    player.tokens[color] -= distcountedNeeded;
-                    newBank[color] += distcountedNeeded;
-                } else {
-                    const shortage = distcountedNeeded - player.tokens[color];
-                    player.tokens[color] = 0; // Paid all owned
-                    newBank[color] += (distcountedNeeded - shortage); // Paid what we had
-                    goldNeeded += shortage;
-                }
-            });
-
-            // Pay Gold
-            if (player.tokens.gray < goldNeeded) return state; // Should be validated in UI
-            player.tokens.gray -= goldNeeded;
-            newBank.gray += goldNeeded;
+            for (const color of Object.keys(payment) as (keyof TokenBank)[]) {
+                player.tokens[color] -= payment[color];
+                newBank[color] += payment[color];
+            }
 
             // Prepare new Market and Decks state (Immutable)
             const newMarket = { ...state.market };
@@ -237,7 +206,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             const newPlayers = [...state.players];
             newPlayers[playerIndex] = player;
 
-            let newStateLogs = [...state.logs, `${player.name} recruited ${card.name || 'a card'} (${card.points}pt).`];
+            const newStateLogs = [...state.logs, `${player.name} recruited ${card.name || 'a card'} (${card.points}pt).`];
             let avengersTileOwnerId = state.avengersTileOwnerId;
 
             // --- Avengers Assemble Tile Mechanic ---
@@ -339,53 +308,8 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             return processEndTurn({ ...stateWithReserve, lastActionAt: Date.now() });
         }
 
-        case 'END_TURN': {
-            const player = state.players[state.currentPlayerIndex];
-            let nextState = { ...state };
-
-            // Check Win Condition Trigger: 16 Points + Green Stone
-            // If condition met, and not already in final round, trigger final round.
-            if (!state.finalRound && player.points >= 16 && player.tokens.green > 0) {
-                nextState.finalRound = true;
-                nextState.logs = [...nextState.logs, `${player.name} has triggered the end game! Finishing the round...`];
-            }
-
-            const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
-
-            // Check if Round Ended (back to player 0)
-            if (nextIndex === 0) {
-                // If we are in final round, game ends now.
-                if (nextState.finalRound) {
-                    // Determine Winner
-                    // Tie-breaker: Most points -> Fewest Development Cards (Tableau size)
-                    const sortedPlayers = [...nextState.players].sort((a, b) => {
-                        if (b.points !== a.points) return b.points - a.points;
-                        return a.tableau.length - b.tableau.length; // Fewer cards is better
-                    });
-
-                    const winners = sortedPlayers.filter(p =>
-                        p.points === sortedPlayers[0].points &&
-                        p.tableau.length === sortedPlayers[0].tableau.length
-                    );
-
-                    const winnerNames = winners.map(p => p.name).join(' & ');
-
-                    return {
-                        ...nextState,
-                        currentPlayerIndex: nextIndex, // Reset to 0 just in case
-                        winner: winnerNames,
-                        status: 'GAME_OVER',
-                        logs: [...nextState.logs, `Round Complete. GAME OVER! ${winnerNames} WINS with ${winners[0].points} points!`]
-                    };
-                }
-            }
-
-            return {
-                ...nextState,
-                currentPlayerIndex: nextIndex,
-                turn: nextIndex === 0 ? state.turn + 1 : state.turn
-            };
-        }
+        case 'END_TURN':
+            return processEndTurn(state);
 
         case 'PLAYER_JOINED': {
             if (state.players.some(p => p.id === action.player.id)) return state;
@@ -442,7 +366,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
 
         case 'SELECT_LOCATION': {
             const playerIndex = state.currentPlayerIndex;
-            let player = { ...state.players[playerIndex] };
+            const player = { ...state.players[playerIndex] };
 
             // Verify pending
             if (!state.pendingLocationSelection || state.pendingLocationSelection.length === 0) return state;
@@ -489,7 +413,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
 const advanceTurn = (state: GameState): GameState => {
     // Check Win Condition Trigger: 16 Points + Green Stone + 1 Card of Each Color
     const player = state.players[state.currentPlayerIndex];
-    let nextState = { ...state };
+    const nextState = { ...state };
 
     // Check Win Condition Trigger: 16 Points + Green Stone
     // If condition met, and not already in final round, trigger final round.
@@ -499,8 +423,8 @@ const advanceTurn = (state: GameState): GameState => {
         // Wait, the original code had: "if (!state.finalRound && player.points >= 16 && player.tokens.green > 0) ... hasAllColors ..."
         // I will preserving the exact original win condition logic.
         const playerColors = new Set(player.tableau.map(c => c.bonus));
-        const requiredColors = ['red', 'blue', 'yellow', 'purple', 'orange'];
-        const hasAllColors = requiredColors.every(color => playerColors.has(color as any));
+        const requiredColors = ['red', 'blue', 'yellow', 'purple', 'orange'] as const;
+        const hasAllColors = requiredColors.every(color => playerColors.has(color));
 
         // Note: The original generic win condition in Splendor is just 15/16 points. 
         // Marvel Splendor specific: 16 points + Time Stone (Green) + 1 of each color bonus.

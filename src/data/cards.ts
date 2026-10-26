@@ -5,7 +5,7 @@ import valkyrieImg from '../assets/card-art/Valkyrie.jpg';
 import quakeImg from '../assets/card-art/Quake.webp';
 import chavezImg from '../assets/card-art/chavez.png';
 import mariaHillImg from '../assets/card-art/mariahill.png';
-import shuriImg from '../assets/card-art/shuri.webp';
+import shuriImg from '../assets/card-art/Shuri.webp';
 import okoyeImg from '../assets/card-art/okoye.png';
 
 // Mapping Standard Splendor -> Marvel Splendor

@@ -36,11 +36,6 @@ function App() {
 	const [copyFeedback, setCopyFeedback] = useState(false);
 	const [randomizeOrder, setRandomizeOrder] = useState(true);
 
-	// Clear error when name or id changes
-	useEffect(() => {
-		if (formError) setFormError('');
-	}, [playerName, remoteId]);
-
 	const myPlayerId = isLocal ? null : mpState.playerId;
 
 
@@ -65,7 +60,7 @@ function App() {
 			return;
 		}
 
-		let finalPlayers = [...state.players];
+		const finalPlayers = [...state.players];
 		if (randomizeOrder && finalPlayers.length >= 2) {
 			// Fisher-Yates Shuffle
 			for (let i = finalPlayers.length - 1; i > 0; i--) {
@@ -97,7 +92,7 @@ function App() {
 										type="text"
 										placeholder="Enter Your Name"
 										value={playerName}
-										onChange={(e) => setPlayerName(e.target.value)}
+										onChange={(e) => { setPlayerName(e.target.value); setFormError(''); }}
 										style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', width: '100%', boxSizing: 'border-box', textAlign: 'center', fontSize: '1.1rem' }}
 									/>
 								</div>
@@ -179,7 +174,7 @@ function App() {
 												type="text"
 												placeholder="Enter Game Code (UUID)"
 												value={remoteId}
-												onChange={(e) => setRemoteId(e.target.value)}
+												onChange={(e) => { setRemoteId(e.target.value); setFormError(''); }}
 												style={{ padding: '10px', borderRadius: '5px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', flex: 1 }}
 											/>
 											<button className="btn-primary" onClick={() => {
@@ -356,6 +351,7 @@ function App() {
 					myUUID={playerUUID}
 					closeLobby={closeLobby}
 					isHost={mpState.isHost}
+					syncError={mpState.errorMessage}
 				/>
 			)}
 		</div>
